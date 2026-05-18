@@ -1,10 +1,19 @@
 # npmguard
 
+[![CI](https://img.shields.io/github/actions/workflow/status/AyoubTadlaoui/npmguard/ci.yml?branch=main&style=flat-square&label=CI&color=99ffe4&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/actions/workflow/status/AyoubTadlaoui/npmguard/release.yml?style=flat-square&label=release&color=3b82f6&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/AyoubTadlaoui/npmguard?style=flat-square&color=3b82f6&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/releases/latest)
+[![Stars](https://img.shields.io/github/stars/AyoubTadlaoui/npmguard?style=flat-square&color=ff8080&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-3b82f6.svg?style=flat-square&labelColor=000000)](LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/AyoubTadlaoui/npmguard?style=flat-square&color=a0a0a0&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/commits/main)
+
 > **A native safety gate for `npm install`, built for humans and AI coding agents.** It checks package risk before install and blocks known-malicious or typosquatted packages before lifecycle scripts can run.
 
 Distributed **outside** the npm ecosystem so it can't be compromised by the thing it's protecting you from. Written in Rust. Single static binary.
 
 ![npmguard blocking a typosquat](docs/demo.gif)
+
+<sub>Live verdict against the npm registry — `lodahs` is a real typosquat of `lodash` flagged in OSV's malware namespace. Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok). Sibling project: [GoLogX](https://github.com/AyoubTadlaoui/GoLogX) (pretty `log/slog` for Go) — same distribution playbook (Homebrew, Scoop, AUR, install.sh) lands here in v0.2.</sub>
 
 ```
 $ npmguard check lodahs
@@ -14,8 +23,6 @@ npmguard  lodahs@0.0.1-security  →  score 115 / 200  (block, thresholds warn=3
    25 pts  Typosquat            name 'lodahs' is 1 edit away from popular package 'lodash'
    80 pts  KnownCve             1 CONFIRMED MALICIOUS by OSV for this version: MAL-2025-25502
 ```
-
-(Real verdict from `target/release/npmguard` against the live registry. `lodahs` is a known typosquat of `lodash` that npm's malware database has flagged — npmguard refuses the install.)
 
 ---
 
