@@ -180,11 +180,15 @@ Composite score is the sum (capped at 200). Default thresholds: `warn ≥ 30`, `
 
 Honesty is the contract.
 
-- **Does not** catch attacks that pass all heuristic checks. A clean-history maintainer-account-takeover that ships a package matching every "looks normal" signal will still install.
-- **Does not** protect against zero-day vulnerabilities in legitimate packages. That's `npm audit` / Snyk territory.
-- **Does not** stop attacks that run **outside** lifecycle scripts. If a package is malicious only when imported and used at runtime, this tool isn't there.
-- **Does not** replace `npm audit`, Snyk, Socket, Dependabot, or code review. It's an additional layer.
-- **Does not** yet sandbox lifecycle scripts. v0.1 surfaces the verdict; v0.2 adds the sandbox + real `npm install` execution.
+> **npmguard cannot prove packages are safe.** It can stop known-malicious packages (OSV `MAL-*`), flag typosquats, surface lifecycle scripts / package age / maintainer churn, and route AI coding agents through the same verdict. That's it. Everything below is what the v1.0 sentence will eventually add — see [ROADMAP.md](ROADMAP.md).
+
+What's still missing in v0.1:
+
+- **Doesn't catch attacks that pass all heuristic checks.** A clean-history maintainer-account-takeover that ships a release matching every "looks normal" signal will still install. The v0.2 *release-anomaly engine* (per-version `package.json` diff) is the planned answer.
+- **Doesn't yet verify npm provenance / package signatures.** A historical provenance attestation suddenly missing is a strong takeover signal — that lands in v0.3.
+- **Doesn't yet sandbox lifecycle scripts or wrap the real `npm install` subprocess.** v0.1 surfaces the verdict and stops; v0.2 ships the sandbox (landlock / sandbox-exec / Job Object) + `--ignore-scripts` enforcement + per-script allow-list.
+- **Doesn't protect against malicious code that runs *at import time*, not install time.** If a package is benign at install but evil when imported, this tool isn't in the path. That's a runtime-sandbox problem and is **deliberately out of scope** — see ROADMAP.md.
+- **Doesn't replace `npm audit`, Snyk, Socket, Dependabot, or code review.** It's an additional layer. v0.3 adds `--with npm-audit` / `--with osv-lockfile` / `--with socket` adapters so npmguard becomes the policy gate on top of them rather than a redundant scanner.
 - Is **not** a guarantee. Any tool claiming "secure" is lying. This one says "reduces blast radius" and stops there.
 
 ---
@@ -194,17 +198,22 @@ Honesty is the contract.
 npmguard follows [Semantic Versioning](https://semver.org/). While the project is `0.x`:
 
 - The CLI is treated as stable for end users — flag names and exit codes won't change without a major bump.
-- The MCP tool surface (`install_package` input/output schema) may make minor additive changes between `0.x` releases. Anything breaking is called out in [CHANGELOG.md](CHANGELOG.md) (planned).
+- The MCP tool surface (`install_package` input/output schema) may make minor additive changes between `0.x` releases. Anything breaking is called out in [CHANGELOG.md](CHANGELOG.md).
 
 Tagged releases publish prebuilt binaries to the [Releases](https://github.com/AyoubTadlaoui/npmguard/releases) page (macOS x86_64 + arm64, Linux x86_64 + arm64, Windows x86_64) via a cross-platform GitHub Actions matrix.
 
-Roadmap:
+Roadmap (full reasoning + considered-and-rejected scope in [ROADMAP.md](ROADMAP.md)):
 
-| Phase | Scope |
+| Phase | Headline |
 |---|---|
-| **v0.1** (now) | Risk engine + CLI + MCP server + SQLite cache + GitHub Releases |
-| **v0.2** | Sandbox layer (landlock / sandbox-exec / Job Object) + real `npm install` execution + Homebrew/Scoop/install.sh distribution |
-| **v0.3** | Config file, custom signal weights, organization-wide policy bundles |
+| **v0.1** (shipped) | Risk engine + CLI + MCP server + SQLite cache + GitHub Releases |
+| **v0.2** | Real `npm install` execution + per-OS sandbox + **release-anomaly engine** (per-version `package.json` diff) + Homebrew/Scoop/AUR/install.sh distribution |
+| **v0.3** | Provenance / signature verification + scanner adapters (`--with npm-audit`, `--with osv-lockfile`, `--with socket`) + SBOM generation |
+| **v0.4** | `npmguard.toml` policy file + CI mode + waivers |
+| **v0.5** | Organization presets + MCP marketplace placement (Claude Code, Cursor, Smithery) |
+| **v1.0** | Frozen Rust API, frozen MCP tool schema, frozen JSON output, integration into AI-assistant default docs |
+
+Runtime sandboxing (`npmguard run npm test`) is **deliberately out of scope** — see [ROADMAP.md § Considered and kept out of scope](ROADMAP.md#considered-and-kept-out-of-scope) for the reasoning.
 
 ---
 
