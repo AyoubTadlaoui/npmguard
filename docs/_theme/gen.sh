@@ -70,14 +70,15 @@ ffmpeg -hide_banner -loglevel error -y \
   -c:v libx264 -preset slow -crf 22 \
   "${HERE}/demo.mp4"
 
-echo "→ hero.png (extract last frame of raw GIF, apply shader)"
-ffmpeg -hide_banner -loglevel error -y -sseof -2 -i "${HERE}/_demo_raw.gif" \
+echo "→ hero.png (separate vhs pose with empty top/bottom bands)"
+vhs "${HERE}/hero.tape"
+ffmpeg -hide_banner -loglevel error -y -sseof -1 -i "${HERE}/_hero_raw.gif" \
   -vsync vfr -frames:v 1 -update 1 "${HERE}/_hero_raw.png"
 python3 "${THEME}/_shader.py" "${HERE}/_hero_raw.png" "${HERE}/hero.png"
 
 # Drop intermediates.
 rm -rf "${HERE}/_frames"
-rm -f "${HERE}/_demo_raw.gif" "${HERE}/_hero_raw.png"
+rm -f "${HERE}/_demo_raw.gif" "${HERE}/_hero_raw.gif" "${HERE}/_hero_raw.png"
 
 echo "done."
 echo "  hero.png   $(du -h ${HERE}/hero.png   | cut -f1)"
