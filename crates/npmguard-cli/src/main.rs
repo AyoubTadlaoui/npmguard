@@ -6,6 +6,7 @@
 
 use std::io::{IsTerminal, Write};
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -13,6 +14,79 @@ use owo_colors::OwoColorize;
 
 use npmguard_cache::VerdictCache;
 use npmguard_risk::{PackageRef, RiskEngine, RiskLevel, RiskVerdict, Thresholds};
+
+/// Color enablement, decided once at startup. Bare `.bold()`/`.red()` calls
+/// from `owo_colors` always emit ANSI; we gate them through the `color` module
+/// below so `--no-color`, the `NO_COLOR` env var, and a non-TTY stdout all
+/// turn into actual plain text.
+mod color {
+    use super::*;
+
+    static DISABLED: AtomicBool = AtomicBool::new(false);
+
+    pub fn configure(no_color_flag: bool) {
+        let env_no_color = std::env::var_os("NO_COLOR").is_some();
+        let not_a_tty = !std::io::stdout().is_terminal();
+        if no_color_flag || env_no_color || not_a_tty {
+            DISABLED.store(true, Ordering::Relaxed);
+        }
+        // Keep owo_colors' own auto-detect in sync for any caller that uses
+        // `if_supports_color`.
+        owo_colors::set_override(!DISABLED.load(Ordering::Relaxed));
+    }
+
+    pub fn enabled() -> bool {
+        !DISABLED.load(Ordering::Relaxed)
+    }
+
+    pub fn bold<T: std::fmt::Display + OwoColorize>(t: T) -> String {
+        if enabled() {
+            t.bold().to_string()
+        } else {
+            t.to_string()
+        }
+    }
+
+    pub fn red_bold<T: std::fmt::Display + OwoColorize>(t: T) -> String {
+        if enabled() {
+            t.red().bold().to_string()
+        } else {
+            t.to_string()
+        }
+    }
+
+    pub fn yellow_bold<T: std::fmt::Display + OwoColorize>(t: T) -> String {
+        if enabled() {
+            t.yellow().bold().to_string()
+        } else {
+            t.to_string()
+        }
+    }
+
+    pub fn blue_bold<T: std::fmt::Display + OwoColorize>(t: T) -> String {
+        if enabled() {
+            t.blue().bold().to_string()
+        } else {
+            t.to_string()
+        }
+    }
+
+    pub fn green<T: std::fmt::Display + OwoColorize>(t: T) -> String {
+        if enabled() {
+            t.green().to_string()
+        } else {
+            t.to_string()
+        }
+    }
+
+    pub fn yellow<T: std::fmt::Display + OwoColorize>(t: T) -> String {
+        if enabled() {
+            t.yellow().to_string()
+        } else {
+            t.to_string()
+        }
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(
@@ -78,9 +152,7 @@ fn main() -> ExitCode {
         )
         .try_init();
 
-    if cli.no_color {
-        owo_colors::set_override(false);
-    }
+    color::configure(cli.no_color);
 
     let rt = match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -97,7 +169,7 @@ fn main() -> ExitCode {
         match run(cli).await {
             Ok(code) => code,
             Err(e) => {
-                eprintln!("{} {}", "error:".red().bold(), e);
+                eprintln!("{} {}", color::red_bold("error:"), e);
                 1
             }
         }
@@ -196,7 +268,7 @@ fn present(
         RiskLevel::Block => {
             eprintln!(
                 "{} refusing to install {} (score {} ≥ block threshold {})",
-                "blocked:".red().bold(),
+                color::red_bold("blocked:"),
                 verdict.package.display(),
                 verdict.score,
                 thresholds.block
@@ -207,7 +279,7 @@ fn present(
             if auto_yes {
                 println!(
                     "{} install requested with --yes; would proceed in v0.2.",
-                    "warn:".yellow().bold()
+                    color::yellow_bold("warn:")
                 );
                 Ok(notice_pending_install())
             } else if std::io::stdin().is_terminal() {
@@ -218,13 +290,13 @@ fn present(
                 if proceed {
                     Ok(notice_pending_install())
                 } else {
-                    println!("{} aborted by user.", "warn:".yellow().bold());
+                    println!("{} aborted by user.", color::yellow_bold("warn:"));
                     Ok(1)
                 }
             } else {
                 eprintln!(
                     "{} non-TTY; auto-declining warn-level install. Re-run with --yes to override.",
-                    "warn:".yellow().bold()
+                    color::yellow_bold("warn:")
                 );
                 Ok(1)
             }
@@ -236,24 +308,21 @@ fn present(
 fn notice_pending_install() -> i32 {
     println!(
         "\n{} v0.1 prints verdicts but does NOT yet execute `npm install`. \n  → v0.2 will run the install inside the sandbox layer.",
-        "note:".blue().bold()
+        color::blue_bold("note:")
     );
     0
 }
 
 fn print_verdict(v: &RiskVerdict, t: &Thresholds) {
     let (label, color_score) = match v.level {
-        RiskLevel::Ok => ("ok".green().to_string(), v.score.green().to_string()),
-        RiskLevel::Warn => ("warn".yellow().to_string(), v.score.yellow().to_string()),
-        RiskLevel::Block => (
-            "block".red().bold().to_string(),
-            v.score.red().bold().to_string(),
-        ),
+        RiskLevel::Ok => (color::green("ok"), color::green(v.score)),
+        RiskLevel::Warn => (color::yellow("warn"), color::yellow(v.score)),
+        RiskLevel::Block => (color::red_bold("block"), color::red_bold(v.score)),
     };
     println!(
         "\n{}  {}@{}  →  score {} / 200  ({}, thresholds warn={} block={})",
-        "npmguard".bold(),
-        v.package.name.bold(),
+        color::bold("npmguard"),
+        color::bold(&v.package.name),
         v.resolved_version,
         color_score,
         label,

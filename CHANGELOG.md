@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] — 2026-05-18
+
+### Fixed
+
+- **`--no-color` was a silent no-op.** The flag set
+  `owo_colors::set_override(false)`, but `set_override` only gates
+  `if_supports_color`-style conditional calls — bare `.bold()` / `.red()` /
+  `.green()` etc. always emit ANSI escape codes regardless. Output piped
+  to a log file or processed by another tool ended up full of
+  `^[[1m...^[[0m` sequences even with `--no-color`.
+
+  Replaced the bare colorize calls with a small `color` module that gates
+  all styling on a single decision made at startup. Three signals
+  collapse it: the `--no-color` flag, the standard `NO_COLOR` env var
+  (https://no-color.org), and whether stdout is a TTY. Pipes now produce
+  clean text by default; the explicit flag and env var both work as
+  documented.
+
 ## [0.1.1] — 2026-05-18
 
 ### Fixed
@@ -62,5 +80,6 @@ MCP tool for AI coding agents.
 - Cross-platform release pipeline (macOS x86_64+arm64, Linux x86_64+arm64,
   Windows x86_64) via GitHub Actions matrix + SHA256SUMS.txt.
 
+[0.1.2]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.2
 [0.1.1]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.1
 [0.1.0]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.0
