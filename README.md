@@ -1,7 +1,10 @@
 # npmguard
 
-> A native safety gate for `npm install`, built for humans and AI coding agents.
+> **A native pre-install risk gate for npm packages, with an MCP tool for AI coding agents.**
 > Pre-install risk scoring + MCP server, distributed outside the npm ecosystem so it can't be compromised by the thing it's protecting you from.
+
+> [!NOTE]
+> **v0.1 is a risk checker + MCP verdict gate. It is not yet a real npm wrapper, installer, or sandbox.** `npmguard check` and `npmguard install` both produce a verdict; the actual `npm install` subprocess execution and cross-platform sandbox land in v0.2. See the roadmap below.
 
 [![CI](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml)
 [![Release](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml)

@@ -128,10 +128,7 @@ async fn run(cli: Cli) -> Result<i32> {
     let mut worst: i32 = 0;
     for spec in packages {
         let pkg = PackageRef::parse(&spec)?;
-        let verdict = engine.evaluate(&pkg).await?;
-        if let Some(c) = &cache {
-            let _ = c.put(&verdict);
-        }
+        let verdict = resolve_verdict(&engine, cache.as_ref(), &pkg).await?;
         let code = present(
             &verdict,
             cli.json,
@@ -142,6 +139,38 @@ async fn run(cli: Cli) -> Result<i32> {
         worst = worst.max(code);
     }
     Ok(worst)
+}
+
+/// Cache-aware verdict resolution: fetch metadata first, consult the cache by
+/// resolved version, full-evaluate only on miss, then write back.
+async fn resolve_verdict(
+    engine: &RiskEngine,
+    cache: Option<&VerdictCache>,
+    pkg: &PackageRef,
+) -> Result<RiskVerdict> {
+    let meta = engine.fetch_metadata(pkg).await?;
+    let signal_hash = engine.signal_set_hash();
+    if let Some(c) = cache {
+        match c.get(pkg, &meta.resolved_version, &signal_hash) {
+            Ok(Some(cached)) => {
+                tracing::debug!(
+                    "cache hit: {}@{}",
+                    cached.package.name,
+                    cached.resolved_version
+                );
+                return Ok(cached);
+            }
+            Ok(None) => {}
+            Err(e) => tracing::warn!("cache get failed (continuing without): {}", e),
+        }
+    }
+    let verdict = engine.evaluate_from_metadata(pkg, meta).await?;
+    if let Some(c) = cache {
+        if let Err(e) = c.put(&verdict) {
+            tracing::warn!("cache put failed (verdict still returned): {}", e);
+        }
+    }
+    Ok(verdict)
 }
 
 fn present(

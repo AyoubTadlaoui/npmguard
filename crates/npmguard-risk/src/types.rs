@@ -111,6 +111,10 @@ pub struct RiskVerdict {
     pub signals: Vec<Signal>,
     /// When the verdict was computed.
     pub fetched_at: DateTime<Utc>,
+    /// When the package version was published to the registry, if the registry
+    /// reported it. Used by the cache to pick a TTL (newer versions → shorter).
+    #[serde(default)]
+    pub published_at: Option<DateTime<Utc>>,
     /// Hash of the active signal set, for cache invalidation when scoring changes.
     pub signal_set_hash: String,
 }

@@ -13,4 +13,5 @@ pub mod types;
 
 pub use engine::RiskEngine;
 pub use scoring::{compute_level, Thresholds};
+pub use signals::PackageMetadata;
 pub use types::{PackageRef, RiskLevel, RiskVerdict, Signal, SignalKind, SignalSetHash};

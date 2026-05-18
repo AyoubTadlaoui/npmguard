@@ -79,13 +79,28 @@ impl Server {
     ) -> Result<CallToolResult, ErrorData> {
         let args = params.0;
         let pkg = PackageRef::new(args.name.clone(), args.version.clone());
-        let verdict = self
+
+        // Cache-aware path: fetch metadata, consult cache, full-evaluate on miss.
+        let meta = self
             .engine
-            .evaluate(&pkg)
+            .fetch_metadata(&pkg)
             .await
-            .map_err(|e| ErrorData::internal_error(format!("evaluate failed: {}", e), None))?;
-        // Best-effort cache write.
-        let _ = self.cache.put(&verdict);
+            .map_err(|e| ErrorData::internal_error(format!("fetch_metadata: {}", e), None))?;
+        let signal_hash = self.engine.signal_set_hash();
+        let verdict = match self.cache.get(&pkg, &meta.resolved_version, &signal_hash) {
+            Ok(Some(cached)) => cached,
+            _ => {
+                let v = self
+                    .engine
+                    .evaluate_from_metadata(&pkg, meta)
+                    .await
+                    .map_err(|e| {
+                        ErrorData::internal_error(format!("evaluate failed: {}", e), None)
+                    })?;
+                let _ = self.cache.put(&v);
+                v
+            }
+        };
 
         let response = VerdictResponse {
             package: pkg.display(),

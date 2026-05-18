@@ -4,7 +4,7 @@ use anyhow::Result;
 use chrono::Utc;
 
 use crate::scoring::{compute_level, Thresholds};
-use crate::signals::{self, registry::NpmRegistryClient};
+use crate::signals::{self, registry::NpmRegistryClient, PackageMetadata};
 use crate::types::{PackageRef, RiskVerdict, SignalKind, SignalSetHash};
 
 pub struct RiskEngine {
@@ -51,13 +51,21 @@ impl RiskEngine {
         SignalSetHash::compute(&self.active, &self.thresholds)
     }
 
-    /// Fetch metadata + all signals in parallel, then compose a verdict.
-    pub async fn evaluate(&self, pkg: &PackageRef) -> Result<RiskVerdict> {
-        let meta = self
-            .registry
-            .fetch(&pkg.name, pkg.version.as_deref())
-            .await?;
+    /// Fetch the registry packument and project it into `PackageMetadata`.
+    /// Exposed so callers can layer a cache lookup between metadata fetch and
+    /// the full evaluation (which also fires OSV + GitHub HTTP).
+    pub async fn fetch_metadata(&self, pkg: &PackageRef) -> Result<PackageMetadata> {
+        self.registry.fetch(&pkg.name, pkg.version.as_deref()).await
+    }
 
+    /// Compose a verdict from a pre-fetched `PackageMetadata`. Runs OSV +
+    /// GitHub signals concurrently. Use this with `fetch_metadata` when you
+    /// want to consult a cache between the two steps.
+    pub async fn evaluate_from_metadata(
+        &self,
+        pkg: &PackageRef,
+        meta: PackageMetadata,
+    ) -> Result<RiskVerdict> {
         // Pure-from-metadata signals.
         let mut signals = Vec::new();
         signals.extend(signals::lifecycle::evaluate(&meta));
@@ -88,7 +96,14 @@ impl RiskEngine {
             level,
             signals,
             fetched_at: Utc::now(),
+            published_at: meta.published_at,
             signal_set_hash: self.signal_set_hash(),
         })
+    }
+
+    /// Convenience: fetch metadata + evaluate in one call. No cache.
+    pub async fn evaluate(&self, pkg: &PackageRef) -> Result<RiskVerdict> {
+        let meta = self.fetch_metadata(pkg).await?;
+        self.evaluate_from_metadata(pkg, meta).await
     }
 }
