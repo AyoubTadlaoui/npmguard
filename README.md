@@ -1,13 +1,11 @@
 # npmguard
 
-[![CI](https://img.shields.io/github/actions/workflow/status/AyoubTadlaoui/npmguard/ci.yml?branch=main&style=flat-square&label=CI&color=99ffe4&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/actions/workflow/status/AyoubTadlaoui/npmguard/release.yml?style=flat-square&label=release&color=3b82f6&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml)
-[![Latest release](https://img.shields.io/github/v/release/AyoubTadlaoui/npmguard?style=flat-square&color=3b82f6&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/releases/latest)
-[![Stars](https://img.shields.io/github/stars/AyoubTadlaoui/npmguard?style=flat-square&color=ff8080&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/stargazers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-3b82f6.svg?style=flat-square&labelColor=000000)](LICENSE)
-[![Last commit](https://img.shields.io/github/last-commit/AyoubTadlaoui/npmguard?style=flat-square&color=a0a0a0&labelColor=000000)](https://github.com/AyoubTadlaoui/npmguard/commits/main)
-
 > **A native safety gate for `npm install`, built for humans and AI coding agents.** It checks package risk before install and blocks known-malicious or typosquatted packages before lifecycle scripts can run.
+
+[![CI](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml)
+[![Release](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/AyoubTadlaoui/npmguard)](https://github.com/AyoubTadlaoui/npmguard/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Distributed **outside** the npm ecosystem so it can't be compromised by the thing it's protecting you from. Written in Rust. Single static binary.
 
