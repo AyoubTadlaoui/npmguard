@@ -1,0 +1,26 @@
+[package]
+name = "npmguard-mcp"
+description = "MCP server exposing npmguard risk evaluation to AI coding assistants"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "npmguard-mcp"
+path = "src/main.rs"
+
+[dependencies]
+npmguard-risk = { workspace = true }
+npmguard-cache = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+rmcp = { workspace = true }
+schemars = { workspace = true }

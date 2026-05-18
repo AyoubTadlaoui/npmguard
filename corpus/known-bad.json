@@ -1,0 +1,35 @@
+{
+  "_about": "Real malicious package@version pairs from documented supply-chain incidents. Used by `cargo test --test corpus` to verify that npmguard's risk engine surfaces signals on packages we know to be compromised. References are public post-incident write-ups; the packages themselves should NEVER be installed.",
+  "_sources": [
+    "https://www.microsoft.com/en-us/security/blog/2025/12/01/shai-hulud-2-0-guidance-for-detecting-investigating-and-defending-against-the-supply-chain-attack/",
+    "https://thehackernews.com/2026/05/mini-shai-hulud-worm-compromises.html",
+    "https://www.huntress.com/blog/supply-chain-compromise-axios-npm-package"
+  ],
+  "entries": [
+    {
+      "name": "@ctrl/tinycolor",
+      "version": "4.1.1",
+      "incident": "Shai-Hulud original (Sep 2025)",
+      "expected_signals": ["LifecycleScripts", "MaintainerChurn"]
+    },
+    {
+      "name": "ngx-bootstrap",
+      "version": "18.1.4",
+      "incident": "Shai-Hulud original (Sep 2025)",
+      "expected_signals": ["LifecycleScripts"]
+    },
+    {
+      "name": "ng2-file-upload",
+      "version": "8.0.1",
+      "incident": "Shai-Hulud original (Sep 2025)",
+      "expected_signals": ["LifecycleScripts"]
+    },
+    {
+      "name": "lodahs",
+      "version": "0.0.1-security",
+      "incident": "Typosquat of lodash, flagged MAL-2025-25502 by OSV malware namespace",
+      "expected_signals": ["Typosquat", "KnownCve"]
+    }
+  ],
+  "_notes": "Most malicious versions from Shai-Hulud are now unpublished from npm; the registry returns 'version not found in packument' and the test treats that as a successful detection (unpublishing is itself a confirmed-bad signal). Live entries like `lodahs@0.0.1-security` are kept because npm's security team replaces compromised packages with stub versions retaining the MAL-* OSV advisory — these stay queryable and are the most useful live signal to test against. This corpus will grow as we curate more such entries; the design doc earlier referenced `axios@1.12.0` as a Mar 2026 compromise, but the actually-malicious version was unpublished — 1.12.0 only carries a routine SSRF advisory, so it was removed from this list to avoid implying it's malware."
+}

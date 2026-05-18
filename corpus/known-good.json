@@ -1,0 +1,14 @@
+{
+  "_about": "Well-maintained, widely-installed npm packages. Used to verify npmguard does NOT raise false-positive `block` verdicts on routine installs. Numbers come from npm download stats as of early 2026.",
+  "entries": [
+    { "name": "lodash", "version": "4.17.21" },
+    { "name": "react", "version": "18.3.1" },
+    { "name": "react-dom", "version": "18.3.1" },
+    { "name": "typescript", "version": "5.4.5" },
+    { "name": "express", "version": "4.19.2" },
+    { "name": "next", "version": "14.2.3" },
+    { "name": "zod", "version": "3.23.8" },
+    { "name": "dayjs", "version": "1.11.11" }
+  ],
+  "_notes": "Some of these (e.g. node-gyp consumers) legitimately ship install scripts. The corpus expects these to land at 'warn' at worst, never 'block', as long as no advisory or churn signal is present."
+}
