@@ -11,7 +11,7 @@ Distributed **outside** the npm ecosystem so it can't be compromised by the thin
 
 ![npmguard blocking a typosquat](docs/demo.gif)
 
-<sub>Live verdict against the npm registry — `lodahs` is a real typosquat of `lodash` flagged in OSV's malware namespace. Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok). Sibling project: [GoLogX](https://github.com/AyoubTadlaoui/GoLogX) (pretty `log/slog` for Go) — same distribution playbook (Homebrew, Scoop, AUR, install.sh) lands here in v0.2.</sub>
+<sub>Live verdict against the npm registry — `lodahs` is a real typosquat of `lodash` flagged in OSV's malware namespace. Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok).</sub>
 
 ```
 $ npmguard check lodahs
