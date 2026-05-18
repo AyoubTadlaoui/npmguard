@@ -13,13 +13,14 @@
 `npmguard install lodahs` — a real typosquat of `lodash`, refused before lifecycle scripts can run:
 
 <!--
-  Animated GIF — recorded with vhs from docs/demo.tape. GitHub's README
-  sanitizer passes <img> through cleanly. The .tape file is checked in
-  so anyone can regenerate the asset with the same atlas-ragnarok theme.
+  Animated WebP renders as an <img> tag, which GitHub's README sanitizer
+  passes through cleanly (it strips <video>). WebP plays in every modern
+  browser including Safari. The MP4 and GIF copies are kept alongside
+  for downloads (links below the image).
 -->
-![npmguard refusing to install a typosquat — atlas-ragnarok theme](docs/demo.gif)
+![npmguard refusing to install a typosquat — atlas-ragnarok theme](docs/demo.webp)
 
-<sub>Live verdict against the npm registry — `lodahs` is in OSV's malware namespace (`MAL-2025-25502`). Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok). Regenerate with `vhs docs/demo.tape`.</sub>
+<sub>Also available as [GIF](docs/demo.gif) or [MP4](docs/demo.mp4). Live verdict against the npm registry — `lodahs` is in OSV's malware namespace (`MAL-2025-25502`). Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok). Regenerate with `sh docs/_theme/gen.sh` (needs `vhs`, `ffmpeg`, `webp`, `pillow`, `numpy`).</sub>
 
 ---
 
