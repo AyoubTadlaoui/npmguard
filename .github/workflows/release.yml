@@ -69,32 +69,44 @@ jobs:
         shell: bash
         run: cargo build --release --workspace --target ${{ matrix.target }}
 
-      - name: stage artifacts
+      - name: compute archive name
         id: stage
         shell: bash
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME:-${{ inputs.tag }}}"
           name="npmguard-${version}-${{ matrix.target }}"
-          mkdir -p "dist/${name}"
-
-          ext=""
-          if [[ "${{ matrix.target }}" == *windows* ]]; then ext=".exe"; fi
-
-          cp "target/${{ matrix.target }}/release/npmguard${ext}" "dist/${name}/"
-          cp "target/${{ matrix.target }}/release/npmguard-mcp${ext}" "dist/${name}/"
-          cp README.md LICENSE "dist/${name}/"
-
-          cd dist
-          if [[ "${{ matrix.archive }}" == "zip" ]]; then
-            7z a "${name}.zip" "${name}" >/dev/null
-            shasum -a 256 "${name}.zip" > "${name}.zip.sha256"
-          else
-            tar -czf "${name}.tar.gz" "${name}"
-            shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
-          fi
-          echo "archive_dir=dist" >> "$GITHUB_OUTPUT"
           echo "archive_name=${name}" >> "$GITHUB_OUTPUT"
+
+      - name: stage artifacts (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="${{ steps.stage.outputs.archive_name }}"
+          mkdir -p "dist/${name}"
+          cp "target/${{ matrix.target }}/release/npmguard" "dist/${name}/"
+          cp "target/${{ matrix.target }}/release/npmguard-mcp" "dist/${name}/"
+          cp README.md LICENSE "dist/${name}/"
+          cd dist
+          tar -czf "${name}.tar.gz" "${name}"
+          shasum -a 256 "${name}.tar.gz" > "${name}.tar.gz.sha256"
+
+      - name: stage artifacts (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "${{ steps.stage.outputs.archive_name }}"
+          New-Item -ItemType Directory -Force -Path "dist/$name" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/npmguard.exe" "dist/$name/"
+          Copy-Item "target/${{ matrix.target }}/release/npmguard-mcp.exe" "dist/$name/"
+          Copy-Item "README.md" "dist/$name/"
+          Copy-Item "LICENSE" "dist/$name/"
+          Push-Location dist
+          Compress-Archive -Path "$name" -DestinationPath "$name.zip" -Force
+          $hash = (Get-FileHash -Algorithm SHA256 "$name.zip").Hash.ToLower()
+          "$hash  $name.zip" | Out-File -Encoding ascii "$name.zip.sha256"
+          Pop-Location
 
       - name: upload artifact
         uses: actions/upload-artifact@v4
