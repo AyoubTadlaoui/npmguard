@@ -48,21 +48,21 @@ Pick whichever fits your machine:
 ```bash
 # macOS (Apple Silicon)
 curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-aarch64-apple-darwin.tar.gz
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.1-aarch64-apple-darwin.tar.gz
 tar -xzf npmguard.tar.gz
-sudo mv npmguard-v0.1.0-aarch64-apple-darwin/npmguard*  /usr/local/bin/
+sudo mv npmguard-v0.1.1-aarch64-apple-darwin/npmguard*  /usr/local/bin/
 
 # macOS (Intel)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-x86_64-apple-darwin.tar.gz
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.1-x86_64-apple-darwin.tar.gz
 
 # Linux (x86_64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.1-x86_64-unknown-linux-gnu.tar.gz
 
 # Linux (aarch64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-aarch64-unknown-linux-gnu.tar.gz
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.1-aarch64-unknown-linux-gnu.tar.gz
 
 # Windows (x86_64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-x86_64-pc-windows-msvc.zip
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.1-x86_64-pc-windows-msvc.zip
 
 # Build from source (any OS with Rust ≥ 1.75)
 cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard
@@ -75,7 +75,7 @@ cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard-mcp
 Every release ships a `SHA256SUMS.txt` — verify before extracting:
 
 ```bash
-shasum -a 256 -c <(grep npmguard-v0.1.0-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
+shasum -a 256 -c <(grep npmguard-v0.1.1-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
 ```
 
 Homebrew tap, Scoop bucket, `curl ... | sh` installer, AUR, and GHCR Docker image land with **v0.2** alongside the sandbox layer. See [DISTRIBUTION.md](DISTRIBUTION.md) (planned) for the full channel matrix.
