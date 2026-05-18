@@ -188,7 +188,7 @@ gets the recommendation as a tool response. Even if the user said
 and ask.
 
 Config in your Claude Code `~/.claude.json`:
-```jsonc
+```json
 {
   "mcpServers": {
     "npmguard": { "command": "/usr/local/bin/npmguard-mcp" }

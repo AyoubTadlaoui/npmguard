@@ -186,6 +186,27 @@ signature-verification path). No web service, no SaaS.
   catalog** + **Smithery** auto-indexing.
 - Drop everything we know is unstable behind feature flags pre-v1.0.
 
+### Official `modelcontextprotocol/registry` submission — deferred
+
+The MCP Registry currently supports `npm` / `PyPI` / `NuGet` / `OCI` /
+`MCPB` packages, not raw native binaries from GitHub Releases. npmguard
+intentionally avoids npm distribution (the whole point), so the `npm`
+registry-type is off the table for branding reasons.
+
+We'll revisit with **OCI** or **MCPB** packaging in v0.2:
+
+- **OCI on GHCR** — push `ghcr.io/ayoubtadlaoui/npmguard-mcp` as part of
+  the v0.2 distribution work alongside Homebrew/Scoop. Adds Docker as a
+  user prerequisite for the registry path but not for the binary path,
+  which stays primary.
+- **MCPB bundle** — the official spec supports `.mcpb` artifacts hosted
+  on GitHub Releases. Preserves the "GitHub Releases, not npm" story
+  better than Docker, but requires understanding the MCPB packaging
+  format (zip + manifest). Investigate in parallel with OCI.
+
+Whichever path wins, the v0.5 marketplace work depends on it landing in
+v0.2 first.
+
 ---
 
 ## v1.0 — stable schema + AI-assistant integration

@@ -123,10 +123,9 @@ All flags:
 
 ## Quickstart — MCP
 
-The `npmguard-mcp` binary speaks the Model Context Protocol over stdio. Add it to any MCP host (Claude Code shown):
+The `npmguard-mcp` binary speaks the Model Context Protocol over stdio. Add it to your MCP host's config (for Claude Code, that's `~/.claude.json`):
 
-```jsonc
-// ~/.claude.json  (or your host's MCP config)
+```json
 {
   "mcpServers": {
     "npmguard": {
