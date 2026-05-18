@@ -1,8 +1,10 @@
 # npmguard
 
-> Stop letting AI agents run raw `npm install`.
+> **A native safety gate for `npm install`, built for humans and AI coding agents.** It checks package risk before install and blocks known-malicious or typosquatted packages before lifecycle scripts can run.
 
-A small, native, supply-chain risk gate for `npm install`. Distributed **outside** the npm ecosystem so it can't be compromised by the thing it's protecting you from. Written in Rust. Single static binary.
+Distributed **outside** the npm ecosystem so it can't be compromised by the thing it's protecting you from. Written in Rust. Single static binary.
+
+![npmguard blocking a typosquat](docs/demo.gif)
 
 ```
 $ npmguard check lodahs
@@ -76,7 +78,24 @@ Honesty is the contract.
 
 ## Installation
 
-> Today: build from source. Released binaries land with v0.2.
+Pre-built binaries for macOS (Intel + Apple Silicon), Linux (x86_64 + aarch64), and Windows (x86_64) are published on every tagged release: [Releases page](https://github.com/AyoubTadlaoui/npmguard/releases/latest).
+
+```sh
+# macOS / Linux: download, verify, install
+curl -L -o npmguard.tar.gz \
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-aarch64-apple-darwin.tar.gz
+tar -xzf npmguard.tar.gz
+sudo mv npmguard-v0.1.0-aarch64-apple-darwin/npmguard /usr/local/bin/
+sudo mv npmguard-v0.1.0-aarch64-apple-darwin/npmguard-mcp /usr/local/bin/
+
+npmguard --help
+```
+
+`SHA256SUMS.txt` is published alongside every release — verify before installing.
+
+Homebrew tap + `curl ... | sh` installer + Scoop bucket land with v0.2.
+
+### Build from source
 
 ```sh
 git clone https://github.com/AyoubTadlaoui/npmguard
