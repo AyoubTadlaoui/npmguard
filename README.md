@@ -1,142 +1,138 @@
 # npmguard
 
-> **A native safety gate for `npm install`, built for humans and AI coding agents.** It checks package risk before install and blocks known-malicious or typosquatted packages before lifecycle scripts can run.
+> A native safety gate for `npm install`, built for humans and AI coding agents.
+> Pre-install risk scoring + MCP server, distributed outside the npm ecosystem so it can't be compromised by the thing it's protecting you from.
 
 [![CI](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml)
 [![Release](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/AyoubTadlaoui/npmguard)](https://github.com/AyoubTadlaoui/npmguard/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Distributed **outside** the npm ecosystem so it can't be compromised by the thing it's protecting you from. Written in Rust. Single static binary.
+![npmguard block verdict — atlas-ragnarok theme](docs/hero.png)
 
-![npmguard blocking a typosquat](docs/demo.gif)
+`npmguard install lodahs` — a real typosquat of `lodash`, refused before lifecycle scripts can run:
 
-<sub>Live verdict against the npm registry — `lodahs` is a real typosquat of `lodash` flagged in OSV's malware namespace. Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok).</sub>
+<!--
+  Animated GIF — recorded with vhs from docs/demo.tape. GitHub's README
+  sanitizer passes <img> through cleanly. The .tape file is checked in
+  so anyone can regenerate the asset with the same atlas-ragnarok theme.
+-->
+![npmguard refusing to install a typosquat — atlas-ragnarok theme](docs/demo.gif)
 
+<sub>Live verdict against the npm registry — `lodahs` is in OSV's malware namespace (`MAL-2025-25502`). Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok). Regenerate with `vhs docs/demo.tape`.</sub>
+
+---
+
+## Why
+
+Across 2025–2026 the npm ecosystem absorbed a series of worm-style supply chain attacks that ran inside `preinstall` / `install` / `postinstall` scripts the moment a downstream user ran `npm install` — Shai-Hulud (Sep 2025), SHA1-Hulud (Nov 2025), the Axios compromise (Mar 2026), Mini Shai-Hulud (May 2026). Defender wins or loses **before the install completes**, not after.
+
+Existing defenses leave a specific gap:
+
+- **`npq`, `safe-npm` / `socket npm`, `npm-risk`** ship as **npm packages**. They run on the thing they're protecting you from. If the wrapper is ever compromised, you've made the problem worse.
+- **`pnpm v10+`, Bun** disable lifecycle scripts by default — but only for users who've moved off `npm`. The npm majority is unprotected.
+- **`npm audit`, Snyk, Dependabot, `lavamoat/allow-scripts`** are excellent at CVE scanning and allow-list management, but they're not a pre-install heuristic gate, and none of them gate AI coding assistants like Claude Code, Cursor, or Windsurf when *they* run `npm install` on your behalf.
+
+`npmguard` fills the specific gap of **pre-install risk scoring + AI-agent gate via MCP, shipped as a single binary outside npm**. Zero external dependencies at runtime beyond the registries it queries.
+
+---
+
+## Install
+
+Pick whichever fits your machine:
+
+```bash
+# macOS (Apple Silicon)
+curl -L -o npmguard.tar.gz \
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-aarch64-apple-darwin.tar.gz
+tar -xzf npmguard.tar.gz
+sudo mv npmguard-v0.1.0-aarch64-apple-darwin/npmguard*  /usr/local/bin/
+
+# macOS (Intel)
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-x86_64-apple-darwin.tar.gz
+
+# Linux (x86_64)
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+
+# Linux (aarch64)
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-aarch64-unknown-linux-gnu.tar.gz
+
+# Windows (x86_64)
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-x86_64-pc-windows-msvc.zip
+
+# Build from source (any OS with Rust ≥ 1.75)
+cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard
+cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard-mcp
+
+# Prebuilt binaries
+#   https://github.com/AyoubTadlaoui/npmguard/releases
 ```
-$ npmguard check lodahs
 
+Every release ships a `SHA256SUMS.txt` — verify before extracting:
+
+```bash
+shasum -a 256 -c <(grep npmguard-v0.1.0-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
+```
+
+Homebrew tap, Scoop bucket, `curl ... | sh` installer, AUR, and GHCR Docker image land with **v0.2** alongside the sandbox layer. See [DISTRIBUTION.md](DISTRIBUTION.md) (planned) for the full channel matrix.
+
+---
+
+## Quickstart — CLI
+
+```bash
+# Evaluate the latest version, no install.
+npmguard check axios
+
+# Pinned version, JSON output (machine-readable for CI).
+npmguard check --json @ctrl/tinycolor@4.1.1
+
+# Install path: v0.1 prints the verdict and stops; v0.2 will run `npm install`
+# inside the sandbox layer if the verdict allows it.
+npmguard install lodash@4.17.21
+
+# Auto-accept warn-level (still refuses block-level).
+npmguard install --yes some-fresh-package
+```
+
+Sample output, real live verdict against the registry:
+
+```text
 npmguard  lodahs@0.0.1-security  →  score 115 / 200  (block, thresholds warn=30 block=70)
    10 pts  SoleMaintainer       single maintainer: adam_baldwin
    25 pts  Typosquat            name 'lodahs' is 1 edit away from popular package 'lodash'
    80 pts  KnownCve             1 CONFIRMED MALICIOUS by OSV for this version: MAL-2025-25502
+blocked: refusing to install lodahs (score 115 ≥ block threshold 70)
 ```
+
+All flags:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--json` | `false` | Emit verdict as JSON instead of colored text |
+| `--no-color` | `false` | Disable ANSI color escapes |
+| `--no-cache` | `false` | Skip the local SQLite verdict cache |
+| `-v` / `-vv` | `warn` | Increase log verbosity |
+| `--yes` (install only) | `false` | Auto-accept warn-level verdicts; block-level still refuses |
 
 ---
 
-## What this is
+## Quickstart — MCP
 
-`npmguard` is a thin wrapper that runs **before** `npm install` does. It:
-
-1. Pulls registry + advisory + repo signals for the package in parallel (sub-second on cache hit).
-2. Computes a composite risk score and a verdict: `ok` / `warn` / `block`.
-3. Refuses to install on `block`, prompts on `warn`, passes through on `ok`.
-4. **Exposes the same check as an MCP tool** so Claude Code / Cursor / Windsurf must go through the gate when *they* install packages on your behalf.
-
-The MCP gate is the load-bearing feature. A CLI alone protects you only when you remember to type `npmguard install` instead of `npm install`. An MCP server protects you whenever your AI assistant tries to install anything — and that is increasingly when `npm install` actually runs in 2026.
-
-## Why this exists
-
-Across 2025–2026 the npm ecosystem absorbed a series of worm-style supply chain attacks that ran inside `preinstall` / `install` / `postinstall` scripts the moment a downstream user typed `npm install`:
-
-- **Shai-Hulud** (Sept 2025) — `@ctrl/tinycolor`, `ngx-bootstrap`, `ng2-file-upload`
-- **SHA1-Hulud** (Nov 2025) — second wave via `preinstall`
-- **Axios compromise** (Mar 2026) — RAT deployed within ~2 seconds of `npm install`
-- **Mini Shai-Hulud** (May 2026) — 170+ packages across SAP, TanStack, Mistral, Guardrails
-
-The pattern is consistent. Defender wins or loses **before the install completes**, not after.
-
-Three existing classes of defense leave a gap:
-
-| Tool | Distribution | Coverage gap |
-|---|---|---|
-| `npq`, `safe-npm` / `socket npm`, `npm-risk` | npm package | Ships on the thing it's protecting you from. If the wrapper itself gets compromised, you've made the problem worse. |
-| `pnpm v10+`, Bun | npm registry / standalone | Disables lifecycle scripts by default — but only for users who've moved off `npm`. The npm majority is unprotected. |
-| `lavamoat/allow-scripts`, `npm audit`, Snyk, Dependabot | npm package / SaaS | Allow-list management, CVE scanning. Not pre-install heuristics, not a runtime gate for AI agents. |
-
-`npmguard` fills the specific gap of: **(1) pre-install risk scoring, (2) AI-agent gate via MCP, (3) shipped as a binary outside npm.**
-
-## What `npmguard` does NOT claim
-
-Honesty is the contract.
-
-- It does **not** catch attacks that pass all heuristic checks. A clean-history maintainer-account-takeover that ships a package matching every "looks normal" signal will still install.
-- It does **not** protect against zero-day vulnerabilities in legitimate packages. That's `npm audit` / Snyk territory.
-- It does **not** stop attacks that run **outside** lifecycle scripts. If a package is malicious only when imported at runtime, this tool isn't there.
-- It does **not** replace `npm audit`, Snyk, Socket, Dependabot, or code review. It's an additional layer.
-- It is **not** a guarantee. Any tool claiming "secure" is lying. We say "reduces blast radius" and stop there.
-
-## Status
-
-**v0.1 — risk-only.** The CLI `check` and `install` commands compute and display verdicts. `install` does not yet shell out to `npm` — it tells you what would happen and exits. The sandbox layer ships in v0.2.
-
-| Feature | v0.1 | v0.2 | v0.3 |
-|---|---|---|---|
-| Risk engine (8 signals) | ✅ | ✅ | ✅ |
-| SQLite verdict cache | ✅ | ✅ | ✅ |
-| CLI (`check`, `install` print verdict) | ✅ | ✅ | ✅ |
-| MCP server (`install_package` tool) | ✅ | ✅ | ✅ |
-| Real `npm install` execution | ⬜ | ✅ | ✅ |
-| Cross-platform sandbox (landlock / sandbox-exec / Job Object) | ⬜ | ✅ | ✅ |
-| Homebrew / Scoop / install.sh distribution | ⬜ | ✅ | ✅ |
-| Corpus benchmark in README (p50 / p99) | ⬜ | ✅ | ✅ |
-
-## Installation
-
-Pre-built binaries for macOS (Intel + Apple Silicon), Linux (x86_64 + aarch64), and Windows (x86_64) are published on every tagged release: [Releases page](https://github.com/AyoubTadlaoui/npmguard/releases/latest).
-
-```sh
-# macOS / Linux: download, verify, install
-curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.0-aarch64-apple-darwin.tar.gz
-tar -xzf npmguard.tar.gz
-sudo mv npmguard-v0.1.0-aarch64-apple-darwin/npmguard /usr/local/bin/
-sudo mv npmguard-v0.1.0-aarch64-apple-darwin/npmguard-mcp /usr/local/bin/
-
-npmguard --help
-```
-
-`SHA256SUMS.txt` is published alongside every release — verify before installing.
-
-Homebrew tap + `curl ... | sh` installer + Scoop bucket land with v0.2.
-
-### Build from source
-
-```sh
-git clone https://github.com/AyoubTadlaoui/npmguard
-cd npmguard
-cargo build --release
-./target/release/npmguard --help
-```
-
-## Usage
-
-```sh
-# Check the latest version (no install, just verdict)
-npmguard check axios
-
-# Check a pinned version, JSON output
-npmguard check --json @ctrl/tinycolor@4.1.1
-
-# Install path (v0.1: prints verdict; v0.2: runs sandboxed `npm install`)
-npmguard install lodash@4.17.21
-```
-
-### MCP — for Claude Code / Cursor / Windsurf
-
-Add this to your MCP config (`~/.claude.json` for Claude Code):
+The `npmguard-mcp` binary speaks the Model Context Protocol over stdio. Add it to any MCP host (Claude Code shown):
 
 ```jsonc
+// ~/.claude.json  (or your host's MCP config)
 {
   "mcpServers": {
     "npmguard": {
-      "command": "/full/path/to/target/release/npmguard-mcp"
+      "command": "/usr/local/bin/npmguard-mcp"
     }
   }
 }
 ```
 
-The server exposes one tool, `install_package(name, version?)`, which returns a structured verdict the model can act on:
+It exposes one tool, `install_package(name, version?)`, returning a structured verdict the model can act on:
 
 ```json
 {
@@ -153,6 +149,10 @@ The server exposes one tool, `install_package(name, version?)`, which returns a 
 }
 ```
 
+The model gets the recommendation in its own message, so even if the user said *"just install whatever you need"*, the assistant has the structured signal to stop and ask.
+
+---
+
 ## Risk signals
 
 | Signal | Points | Triggered when |
@@ -162,50 +162,71 @@ The server exposes one tool, `install_package(name, version?)`, which returns a 
 | `MaintainerChurn` | 20 | Version published after a > 180-day publish gap (dormant package resurrection) |
 | `SoleMaintainer` | 10 | Package has exactly one maintainer |
 | `RepoHealth` | 15 / 10 | Linked GitHub repo is archived / has zero stars and no commits in 6 months |
-| `Typosquat` | 25 | Name is one Levenshtein edit from a popular package |
-| `KnownCve` | 80 / 50 / 20 / 10 / 5 | OSV.dev advisory present. **80** if it's a `MAL-*` (confirmed malicious package). Otherwise CVSS critical / high / medium / low. |
+| `Typosquat` | 25 | Name is one Damerau-Levenshtein edit from a popular package (catches char swaps like `lodahs`↔`lodash`) |
+| `KnownCve` | 80 / 50 / 20 / 10 / 5 | OSV.dev advisory present. **80** if it's a `MAL-*` (OSV's confirmed-malicious-package namespace). Otherwise CVSS critical / high / medium / low. |
 | `Deprecated` | 10 | npm registry marks this version deprecated |
 
 Composite score is the sum (capped at 200). Default thresholds: `warn ≥ 30`, `block ≥ 70`. Tunable per project via config (planned for v0.2).
 
-**Weights are starting values, not science.** They will be tuned against the corpus in [`corpus/`](corpus/) and the values published as part of each release. PRs welcome.
+**Weights are starting values, not science.** They will be tuned against [`corpus/`](corpus/) and the values published as part of each release. PRs welcome.
 
-## Distribution
+---
 
-`npmguard` is intentionally not on npm. v0.2 will ship via:
+## What npmguard does NOT do
 
-- GitHub Releases (prebuilt binaries × 6 targets)
-- Homebrew tap: `brew install AyoubTadlaoui/tap/npmguard`
-- `curl -fsSL ... | sh` install script
-- GHCR Docker image for CI
+Honesty is the contract.
 
-## Project layout
+- **Does not** catch attacks that pass all heuristic checks. A clean-history maintainer-account-takeover that ships a package matching every "looks normal" signal will still install.
+- **Does not** protect against zero-day vulnerabilities in legitimate packages. That's `npm audit` / Snyk territory.
+- **Does not** stop attacks that run **outside** lifecycle scripts. If a package is malicious only when imported and used at runtime, this tool isn't there.
+- **Does not** replace `npm audit`, Snyk, Socket, Dependabot, or code review. It's an additional layer.
+- **Does not** yet sandbox lifecycle scripts. v0.1 surfaces the verdict; v0.2 adds the sandbox + real `npm install` execution.
+- Is **not** a guarantee. Any tool claiming "secure" is lying. This one says "reduces blast radius" and stops there.
 
+---
+
+## Versioning & releases
+
+npmguard follows [Semantic Versioning](https://semver.org/). While the project is `0.x`:
+
+- The CLI is treated as stable for end users — flag names and exit codes won't change without a major bump.
+- The MCP tool surface (`install_package` input/output schema) may make minor additive changes between `0.x` releases. Anything breaking is called out in [CHANGELOG.md](CHANGELOG.md) (planned).
+
+Tagged releases publish prebuilt binaries to the [Releases](https://github.com/AyoubTadlaoui/npmguard/releases) page (macOS x86_64 + arm64, Linux x86_64 + arm64, Windows x86_64) via a cross-platform GitHub Actions matrix.
+
+Roadmap:
+
+| Phase | Scope |
+|---|---|
+| **v0.1** (now) | Risk engine + CLI + MCP server + SQLite cache + GitHub Releases |
+| **v0.2** | Sandbox layer (landlock / sandbox-exec / Job Object) + real `npm install` execution + Homebrew/Scoop/install.sh distribution |
+| **v0.3** | Config file, custom signal weights, organization-wide policy bundles |
+
+---
+
+## Contributing
+
+PRs and issues welcome. The short version:
+
+```bash
+cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+NPMGUARD_CORPUS=1 cargo test --test corpus -- --nocapture   # live network test
 ```
-crates/
-├── npmguard-risk/    # signal fetchers + composite scoring
-├── npmguard-cache/   # SQLite verdict cache
-├── npmguard-cli/     # `npmguard` binary (clap)
-└── npmguard-mcp/     # `npmguard-mcp` binary (rmcp, stdio transport)
-corpus/
-├── known-bad.json    # documented compromised packages, with expected signals
-└── known-good.json   # high-traffic packages that should not block
-```
+
+Open the PR once that's clean.
+
+---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
-## Acknowledgments
+---
 
-The threat model and prior-art landscape draw on:
+### About the author
 
-- Microsoft Security Blog — Shai-Hulud 2.0
-- Unit 42 — Shai-Hulud worm analysis
-- Snyk — npm Security Best Practices (post Shai-Hulud)
-- The Hacker News — Mini Shai-Hulud coverage
-- StepSecurity — Securing Vibe Coding and AI Coding Agents
-- pnpm — Mitigating supply chain attacks
-- `lirantal/npq`, `Freedruk/npm-risk` — prior-art pre-install checkers
-- `modelcontextprotocol/rust-sdk` (`rmcp`) — MCP transport
-- `landlock` and `rappct` crates — sandbox primitives (for v0.2)
+**Ayoub Tadlaoui** — *Atlas Kaisar* — a problem-solver from Morocco, building software since 2016.
+
+> "High performance knows no part-time commitment."
