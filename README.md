@@ -78,7 +78,16 @@ Every release ships a `SHA256SUMS.txt` — verify before extracting:
 shasum -a 256 -c <(grep npmguard-v0.1.2-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
 ```
 
-Homebrew tap, Scoop bucket, `curl ... | sh` installer, AUR, and GHCR Docker image land with **v0.2** alongside the sandbox layer. See [DISTRIBUTION.md](DISTRIBUTION.md) (planned) for the full channel matrix.
+### Docker (`npmguard-mcp` only)
+
+```bash
+docker pull ghcr.io/ayoubtadlaoui/npmguard-mcp:latest
+docker run --rm -i ghcr.io/ayoubtadlaoui/npmguard-mcp:latest
+```
+
+The Docker image is provided for MCP catalogs and CI; native binaries remain the recommended local install path. The image ships only the `npmguard-mcp` server (not the CLI), runs as a non-root user, and has no exposed ports — MCP hosts communicate over stdio.
+
+Homebrew tap, Scoop bucket, `curl ... | sh` installer, and AUR land with **v0.2** alongside the sandbox layer. See [DISTRIBUTION.md](DISTRIBUTION.md) (planned) for the full channel matrix.
 
 ---
 

@@ -1,0 +1,68 @@
+name: docker
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag or branch to build (e.g. v0.1.2)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/npmguard-mcp
+
+jobs:
+  build-and-push:
+    name: build & push ghcr.io/${{ github.repository_owner }}/npmguard-mcp
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: extract version
+        id: ver
+        shell: bash
+        run: |
+          ref="${{ inputs.tag || github.ref_name }}"
+          # Strip any leading "v" for the bare semver tag (e.g. 0.1.2),
+          # but keep the v-prefixed tag too (e.g. v0.1.2). Both are pushed.
+          semver="${ref#v}"
+          echo "v_tag=${ref}" >> "$GITHUB_OUTPUT"
+          echo "semver=${semver}" >> "$GITHUB_OUTPUT"
+
+      - name: docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: docker login (ghcr)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.v_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.ver.outputs.semver }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.ver.outputs.semver }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
