@@ -17,7 +17,9 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/npmguard-mcp
+  # GHCR rejects uppercase repository names. Hardcoded lowercase rather than
+  # depending on shell-level lowercasing of github.repository_owner.
+  IMAGE_NAME: ayoubtadlaoui/npmguard-mcp
 
 jobs:
   build-and-push:
