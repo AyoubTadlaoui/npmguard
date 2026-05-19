@@ -29,7 +29,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          # On tag push, build from the tag itself (it has the Dockerfile by
+          # construction). On workflow_dispatch, build from main — needed
+          # when retro-tagging an older release whose tag predates the
+          # Dockerfile. The npmguard-mcp source at that tag is unchanged on
+          # main since version bumps live in Cargo.toml only.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
 
       - name: extract version
         id: ver
