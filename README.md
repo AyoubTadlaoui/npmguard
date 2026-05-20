@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="npmguard logo" width="150" />
+</p>
+
 # npmguard
 
 > **A native pre-install risk gate for npm packages, with an MCP tool for AI coding agents.**
