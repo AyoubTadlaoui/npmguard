@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] — 2026-05-20
+
+### Fixed
+
+- **MCP `install_package` recommendation contradicted its own signals.** An
+  `ok` verdict that still carried sub-threshold signals (e.g. a deprecated
+  package, a sole maintainer) reported "No significant risk signals detected"
+  while simultaneously listing those signals. The `ok` recommendation is now
+  signal-aware: with zero signals it reads "Safe to install. No risk signals
+  detected."; with signals below the warning threshold it reports the count and
+  states they are below the threshold.
+
+- **Unknown or pinned-but-missing versions returned an opaque internal error.**
+  Requesting a version absent from the registry packument (e.g. a
+  since-unpublished release) surfaced as JSON-RPC `-32603` (internal error). It
+  now returns `-32602` (invalid params) with a clear "package or version not
+  found" message — a client input problem, reported as one.
+
+### Documentation
+
+- macOS may quarantine release archives downloaded through a browser; the
+  install section now documents clearing it with
+  `xattr -dr com.apple.quarantine`.
+
 ## [0.1.2] — 2026-05-18
 
 ### Fixed

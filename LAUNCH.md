@@ -6,7 +6,7 @@ sequence to execute — copy-paste-ready titles, bodies, commands, and timing.
 > **Honest framing rule.** Pitch this as *"a pre-install risk gate for npm
 > packages, with an MCP tool for AI coding agents."* It is not "drop-in
 > npm install protection" (that ships in v0.2 with the sandbox). Stick to
-> what v0.1.2 actually does — pre-install risk scoring + a verdict gate
+> what v0.1.3 actually does — pre-install risk scoring + a verdict gate
 > that AI assistants can call before they run `npm install` on your behalf.
 
 ---
@@ -18,7 +18,7 @@ What's already shipped:
 | Asset | Location |
 |---|---|
 | Public repo | https://github.com/AyoubTadlaoui/npmguard |
-| Latest release (v0.1.2) | https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.2 |
+| Latest release (v0.1.3) | https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.3 |
 | Demo GIF (atlas-ragnarok) | `docs/demo.gif` (also `.webp`, `.mp4`) |
 | Hero PNG | `docs/hero.png` |
 | Repo topics (10 tags) | `supply-chain-security`, `npm`, `mcp`, etc. |
@@ -46,8 +46,8 @@ cd ~/npmguard
 git status
 git log --oneline -3
 
-# 2. Release v0.1.2 has all 6 assets
-gh release view v0.1.2 --json url,assets --jq '{url, count: (.assets | length), assets: [.assets[].name]}'
+# 2. Release v0.1.3 has all 6 assets
+gh release view v0.1.3 --json url,assets --jq '{url, count: (.assets | length), assets: [.assets[].name]}'
 
 # 3. CI is green on main
 gh run list --workflow=ci.yml --limit 1 --json status,conclusion,headSha
@@ -191,7 +191,7 @@ Verify:
 - README renders with the atlas-ragnarok hero PNG visible at top
 - Demo GIF loads (give 2 s to start animating)
 - Badges all show green (CI, Release, Latest release, License)
-- Install section URLs point to v0.1.2 (not v0.1.1 or v0.1.0)
+- Install section URLs point to v0.1.3 (not v0.1.1 or v0.1.0)
 - MCP server section's JSON snippet is valid (no `//` comments)
 
 If anything's broken — **STOP**. Fix and rebuild before posting.
@@ -402,7 +402,7 @@ Sample verdict against the real registry — `lodahs` (typosquat of `lodash`, in
 MCP integration is the part I think most matters for 2026 — Claude Code / Cursor / Windsurf run `npm install` autonomously, and there was no MCP gate for that until now.
 
 Repo: https://github.com/AyoubTadlaoui/npmguard
-v0.1.2 binaries (macOS/Linux/Windows): https://github.com/AyoubTadlaoui/npmguard/releases/latest
+v0.1.3 binaries (macOS/Linux/Windows): https://github.com/AyoubTadlaoui/npmguard/releases/latest
 
 v0.1 is risk-only; real npm subprocess wrap + sandbox is v0.2. Honest about that in the README.
 ```
@@ -529,7 +529,7 @@ Same body as Phase 11.3, with these substitutions:
 
 | Q | A |
 |---|---|
-| "Why not just on npm?" | Meta-supply-chain risk — same reason `safe-npm` shipping on npm was criticized. v0.1.2 ships only via GitHub Releases SHA256-verified. v0.2 adds Homebrew/Scoop. |
+| "Why not just on npm?" | Meta-supply-chain risk — same reason `safe-npm` shipping on npm was criticized. v0.1.3 ships only via GitHub Releases SHA256-verified. v0.2 adds Homebrew/Scoop. |
 | "How is this different from npq?" | Three things: (1) distributed outside npm, (2) escalates OSV `MAL-*` malware-namespace advisories to single-signal block (so `lodahs` actually blocks instead of warning at low severity), (3) ships as an MCP server for AI coding agents. |
 | "Doesn't pnpm v10+ already do this?" | For pnpm users, yes. For the npm majority (~60% of the ecosystem), no. And neither pnpm nor Bun ship an MCP tool. |
 | "Where's the sandbox?" | v0.2. Roadmap is honest about that — see ROADMAP.md. Shipping a half-broken sandbox is worse than no sandbox. |

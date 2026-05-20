@@ -48,21 +48,21 @@ Pick whichever fits your machine:
 ```bash
 # macOS (Apple Silicon)
 curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.2-aarch64-apple-darwin.tar.gz
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-aarch64-apple-darwin.tar.gz
 tar -xzf npmguard.tar.gz
-sudo mv npmguard-v0.1.2-aarch64-apple-darwin/npmguard*  /usr/local/bin/
+sudo mv npmguard-v0.1.3-aarch64-apple-darwin/npmguard*  /usr/local/bin/
 
 # macOS (Intel)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.2-x86_64-apple-darwin.tar.gz
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-x86_64-apple-darwin.tar.gz
 
 # Linux (x86_64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.2-x86_64-unknown-linux-gnu.tar.gz
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
 
 # Linux (aarch64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.2-aarch64-unknown-linux-gnu.tar.gz
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
 
 # Windows (x86_64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.2-x86_64-pc-windows-msvc.zip
+#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-x86_64-pc-windows-msvc.zip
 
 # Build from source (any OS with Rust ≥ 1.75)
 cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard
@@ -75,8 +75,16 @@ cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard-mcp
 Every release ships a `SHA256SUMS.txt` — verify before extracting:
 
 ```bash
-shasum -a 256 -c <(grep npmguard-v0.1.2-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
+shasum -a 256 -c <(grep npmguard-v0.1.3-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
 ```
+
+> **macOS:** if you downloaded the archive through a browser (not `curl`), macOS may flag the binary as untrusted (`"cannot be opened…"` or `Killed: 9`). Clear the quarantine attribute after extracting:
+>
+> ```bash
+> xattr -dr com.apple.quarantine /usr/local/bin/npmguard /usr/local/bin/npmguard-mcp
+> ```
+>
+> The `curl` instructions above avoid this — `curl` does not set the quarantine flag.
 
 ### Docker (`npmguard-mcp` only)
 
