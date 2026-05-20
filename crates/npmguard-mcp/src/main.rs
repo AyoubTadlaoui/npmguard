@@ -43,7 +43,7 @@ struct VerdictResponse {
     /// Human-readable list of triggered signals.
     signals: Vec<SignalResponse>,
     /// Hint for the AI assistant about whether to proceed.
-    recommendation: &'static str,
+    recommendation: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,11 +81,23 @@ impl Server {
         let pkg = PackageRef::new(args.name.clone(), args.version.clone());
 
         // Cache-aware path: fetch metadata, consult cache, full-evaluate on miss.
-        let meta = self
-            .engine
-            .fetch_metadata(&pkg)
-            .await
-            .map_err(|e| ErrorData::internal_error(format!("fetch_metadata: {}", e), None))?;
+        let meta = self.engine.fetch_metadata(&pkg).await.map_err(|e| {
+            // A pinned/unknown version (or missing package) is a client input
+            // problem, not a server fault — surface it as invalid_params with a
+            // clear message instead of an opaque internal error.
+            let full = format!("{:#}", e);
+            if full.contains("not found in registry") {
+                ErrorData::invalid_params(
+                    format!(
+                        "Package or version not found in the npm registry: {}. Check the package name and version.",
+                        pkg.display()
+                    ),
+                    None,
+                )
+            } else {
+                ErrorData::internal_error(format!("fetch_metadata: {}", full), None)
+            }
+        })?;
         let signal_hash = self.engine.signal_set_hash();
         let verdict = match self.cache.get(&pkg, &meta.resolved_version, &signal_hash) {
             Ok(Some(cached)) => cached,
@@ -121,9 +133,15 @@ impl Server {
                 })
                 .collect(),
             recommendation: match verdict.level {
-                RiskLevel::Ok => "Safe to install. No significant risk signals detected.",
-                RiskLevel::Warn => "Warn — surface the signals to the user and get explicit approval before running `npm install`.",
-                RiskLevel::Block => "Block — do NOT install this package without explicit user override. Present the signals and ask the user to confirm.",
+                RiskLevel::Ok if verdict.signals.is_empty() => {
+                    "Safe to install. No risk signals detected.".to_string()
+                }
+                RiskLevel::Ok => format!(
+                    "Low risk — {} minor signal(s) detected, below the warning threshold. Likely safe to install; review the signals if this dependency is security-sensitive.",
+                    verdict.signals.len()
+                ),
+                RiskLevel::Warn => "Warn — surface the signals to the user and get explicit approval before running `npm install`.".to_string(),
+                RiskLevel::Block => "Block — do NOT install this package without explicit user override. Present the signals and ask the user to confirm.".to_string(),
             },
         };
         let body = serde_json::to_string_pretty(&response)
