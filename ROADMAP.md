@@ -78,19 +78,27 @@ vars matching `*TOKEN*` / `*KEY*` / `*SECRET*`, outbound TCP except
 
 ### Release-anomaly engine (the single highest-value signal addition)
 
+> **Status: landed (unreleased), ahead of the rest of v0.2.** The metadata
+> diff below ships as the `ReleaseAnomaly` signal — it needs no real-install
+> or sandbox work, so it went in first. See CHANGELOG `[Unreleased]`.
+
 Most maintainer-takeover incidents share a pattern: the new version is
 *almost identical* to the previous one but adds one new lifecycle
-script or a dep that wasn't there before. v0.2 ships a per-version
-diff:
+script or a dep that wasn't there before. The per-version diff:
 
-- Fetch `package.json` for the resolved version AND the previous version.
-- Flag added `preinstall` / `install` / `postinstall` scripts (+40 pts).
-- Flag new top-level deps not present in the previous N versions (+25).
-- Flag dep count delta > 50% (+15).
-- Flag entropy spikes in install-script contents (base64/hex blobs).
+- ✅ Project the previous version's `scripts`/`dependencies` (already present in
+  the fetched packument — no extra network call).
+- ✅ Flag added `preinstall` / `install` / `postinstall` scripts (+40 pts).
+- ✅ Flag new top-level deps not present in the previous release (+25).
+- ✅ Flag dep count delta > 50% (+15, gated on a meaningful base count).
+- ✅ Flag entropy spikes in install-script contents (base64/hex blobs, +30) —
+  gated on length **and** Shannon entropy to avoid false positives.
 
-This catches "looks normal" releases far better than the
-metadata-only engine in v0.1.
+This already catches "looks normal" releases far better than the
+metadata-only engine in v0.1. **Still open:** diffing against the previous N
+versions (not just the immediate predecessor), per-version maintainer-set
+churn (now possible since the verbose packument carries per-version
+`maintainers`), and detecting subtle *edits* to existing install-script bodies.
 
 ### Distribution
 

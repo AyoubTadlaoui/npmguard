@@ -34,6 +34,7 @@ impl RiskEngine {
                 SignalKind::Typosquat,
                 SignalKind::KnownCve,
                 SignalKind::Deprecated,
+                SignalKind::ReleaseAnomaly,
             ],
         })
     }
@@ -72,6 +73,7 @@ impl RiskEngine {
         signals.extend(signals::age::evaluate(&meta));
         signals.extend(signals::maintainers::evaluate(&meta));
         signals.extend(signals::deprecated::evaluate(&meta));
+        signals.extend(signals::release_anomaly::evaluate(&meta));
         signals.extend(signals::typosquat::evaluate(pkg));
 
         // Network-dependent signals — run concurrently.

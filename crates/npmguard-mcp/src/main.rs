@@ -86,7 +86,10 @@ impl Server {
             // problem, not a server fault — surface it as invalid_params with a
             // clear message instead of an opaque internal error.
             let full = format!("{:#}", e);
-            if full.contains("not found in registry") {
+            // Both a missing version ("... not found in registry packument") and
+            // a missing package (registry "returned 404") are client input
+            // problems, not server faults — surface them as invalid_params.
+            if full.contains("not found in registry") || full.contains("returned 404") {
                 ErrorData::invalid_params(
                     format!(
                         "Package or version not found in the npm registry: {}. Check the package name and version.",

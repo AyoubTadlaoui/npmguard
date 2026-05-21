@@ -183,8 +183,9 @@ The model gets the recommendation in its own message, so even if the user said *
 | `SoleMaintainer` | 10 | Package has exactly one maintainer |
 | `RepoHealth` | 15 / 10 | Linked GitHub repo is archived / has zero stars and no commits in 6 months |
 | `Typosquat` | 25 | Name is one Damerau-Levenshtein edit from a popular package (catches char swaps like `lodahs`↔`lodash`) |
-| `KnownCve` | 80 / 50 / 20 / 10 / 5 | OSV.dev advisory present. **80** if it's a `MAL-*` (OSV's confirmed-malicious-package namespace). Otherwise CVSS critical / high / medium / low. |
+| `KnownCve` | 80 / 50 / 20 / 10 / 5 | OSV.dev advisory present. **80** if it's a `MAL-*` (OSV's confirmed-malicious-package namespace). Otherwise CVSS critical / high / medium / low (base score computed from the advisory's CVSS vector). |
 | `Deprecated` | 10 | npm registry marks this version deprecated |
+| `ReleaseAnomaly` | 40 / 30 / 25 / 15 | This version differs from its predecessor in a takeover-shaped way: a **newly-added** install script (40), an obfuscated high-entropy payload inside an install script (30), a new top-level dependency (25), or > 50% dependency-count growth (15). |
 
 Composite score is the sum (capped at 200). Default thresholds: `warn ≥ 30`, `block ≥ 70`. Tunable per project via config (planned for v0.2).
 
@@ -200,7 +201,7 @@ Honesty is the contract.
 
 What's still missing in v0.1:
 
-- **Doesn't catch attacks that pass all heuristic checks.** A clean-history maintainer-account-takeover that ships a release matching every "looks normal" signal will still install. The v0.2 *release-anomaly engine* (per-version `package.json` diff) is the planned answer.
+- **Doesn't catch attacks that pass all heuristic checks.** The `ReleaseAnomaly` signal now diffs each version against its predecessor and flags the common takeover fingerprint — a newly-added install script, a new dependency, or an obfuscated install-script payload. But a takeover that subtly edits the *contents* of an existing install script without an obvious high-entropy blob, or one that ships malice in plain imported code, can still slip through. The remaining v0.2 answer is wrapping the real `npm install` and sandboxing the scripts that do run.
 - **Doesn't yet verify npm provenance / package signatures.** A historical provenance attestation suddenly missing is a strong takeover signal — that lands in v0.3.
 - **Doesn't yet sandbox lifecycle scripts or wrap the real `npm install` subprocess.** v0.1 surfaces the verdict and stops; v0.2 ships the sandbox (landlock / sandbox-exec / Job Object) + `--ignore-scripts` enforcement + per-script allow-list.
 - **Doesn't protect against malicious code that runs *at import time*, not install time.** If a package is benign at install but evil when imported, this tool isn't in the path. That's a runtime-sandbox problem and is **deliberately out of scope** — see ROADMAP.md.

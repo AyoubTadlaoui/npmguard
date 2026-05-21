@@ -46,10 +46,12 @@ mod tests {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
+            dependencies: HashMap::new(),
             repository_url: None,
             deprecated: None,
             all_versions: vec!["1.0.0".into()],
             time_map: HashMap::new(),
+            previous_version: None,
         }
     }
 

@@ -11,6 +11,7 @@ pub mod lifecycle;
 pub mod maintainers;
 pub mod osv;
 pub mod registry;
+pub mod release_anomaly;
 pub mod typosquat;
 
 pub use registry::{NpmRegistryClient, PackageMetadata};

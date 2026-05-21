@@ -5,6 +5,53 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **`ReleaseAnomaly` signal — the first piece of the v0.2 release-anomaly
+  engine.** Most maintainer-takeover incidents ship a release that is almost
+  identical to the previous one but quietly adds an install hook or a new
+  dependency. This signal diffs the resolved version against its immediate
+  predecessor (chosen by publish time, preferring the prior *stable* release)
+  and flags the takeover fingerprint:
+  - a **newly-added** `preinstall`/`install`/`postinstall` script not present
+    in the previous release (+40);
+  - an obfuscated, high-entropy base64/hex payload embedded in an install-time
+    script body (+30) — gated on length **and** Shannon entropy so ordinary
+    commands like `node-gyp rebuild` don't trip it;
+  - a new top-level dependency absent from the previous release (+25);
+  - over-50% dependency-count growth, gated on a meaningful base count (+15).
+
+  The previous version's `scripts`/`dependencies` already arrive in the
+  packument fetched for the resolved version, so the signal adds **no** extra
+  network round-trip. Adding the signal rotates the cache's signal-set hash, so
+  pre-existing cached verdicts are recomputed automatically.
+
+### Fixed
+
+- **Panic (process abort) on a multibyte deprecation message.** The
+  `Deprecated` signal truncated long messages with `&msg[..120]` — a byte slice
+  that panics when byte 120 lands inside a multibyte UTF-8 character. The
+  `deprecated` field is attacker-controlled registry JSON, so a crafted package
+  could abort `npmguard check` (and, under the release build's `panic =
+  "abort"`, the whole process). Truncation is now char-boundary safe.
+
+- **MCP returned `internal_error` for an unknown package name.** A missing
+  *version* of an existing package already mapped to JSON-RPC `-32602`
+  (invalid params) in v0.1.3, but a missing *package* (registry `404`) still
+  surfaced as `-32603` (internal error) — a client input problem reported as a
+  server fault. Both now map to `invalid_params`.
+
+- **OSV severity under-scored real CVEs.** `severity_rank` parsed the CVSS field
+  as a leading number, but OSV stores it as a vector string
+  (`CVSS:3.1/AV:N/...`), so genuine critical advisories whose only severity was a
+  CVSS vector collapsed to the 5-point "unknown" floor. npmguard now computes the
+  CVSS v3.x base score from the vector (no new dependency; dependency-free
+  calculator validated against canonical spec vectors) and buckets on the real
+  score, while still accepting a bare numeric score and the GHSA
+  `database_specific.severity` fallback.
+
 ## [0.1.3] — 2026-05-20
 
 ### Fixed

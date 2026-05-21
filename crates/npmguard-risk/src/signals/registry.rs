@@ -20,12 +20,27 @@ pub struct PackageMetadata {
     pub published_at: Option<DateTime<Utc>>,
     pub maintainers: Vec<Maintainer>,
     pub scripts: HashMap<String, String>,
+    /// Top-level runtime dependencies of the resolved version (name → range).
+    pub dependencies: HashMap<String, String>,
     pub repository_url: Option<String>,
     pub deprecated: Option<String>,
     /// All known version strings, sorted by publish time descending if available.
     pub all_versions: Vec<String>,
     /// publish time for *each* version (ISO8601) — used to detect ownership-churn windows.
     pub time_map: HashMap<String, DateTime<Utc>>,
+    /// The version published immediately before the resolved one (by publish
+    /// time), projected for release-to-release diffing. `None` when the resolved
+    /// version is the first release or publish times are unavailable.
+    pub previous_version: Option<PreviousVersion>,
+}
+
+/// A prior published version, projected down to the fields the release-anomaly
+/// signal diffs against the resolved version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreviousVersion {
+    pub version: String,
+    pub scripts: HashMap<String, String>,
+    pub dependencies: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,15 +117,8 @@ fn project_metadata(
             )
         })?;
 
-    let scripts = version_obj
-        .get("scripts")
-        .and_then(|v| v.as_object())
-        .map(|o| {
-            o.iter()
-                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
-                .collect::<HashMap<_, _>>()
-        })
-        .unwrap_or_default();
+    let scripts = extract_string_map(version_obj, "scripts");
+    let dependencies = extract_string_map(version_obj, "dependencies");
 
     let maintainers = version_obj
         .get("maintainers")
@@ -169,16 +177,86 @@ fn project_metadata(
         _ => b.cmp(a),
     });
 
+    let previous_version = select_previous_version(raw, &resolved_version, &time_map);
+
     Ok(PackageMetadata {
         name: name.to_string(),
         resolved_version,
         published_at,
         maintainers,
         scripts,
+        dependencies,
         repository_url,
         deprecated,
         all_versions,
         time_map,
+        previous_version,
+    })
+}
+
+/// Project a JSON `version_obj`'s string-valued `key` map (e.g. `scripts`,
+/// `dependencies`) into a `HashMap`. Non-string values are skipped.
+fn extract_string_map(version_obj: &serde_json::Value, key: &str) -> HashMap<String, String> {
+    version_obj
+        .get(key)
+        .and_then(|v| v.as_object())
+        .map(|o| {
+            o.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// A semver version is a prerelease when its core (before any `+build`) carries
+/// a `-` suffix, e.g. `1.2.0-rc.1`.
+fn is_prerelease(v: &str) -> bool {
+    v.split('+').next().is_some_and(|core| core.contains('-'))
+}
+
+/// Pick the version published immediately before `resolved` (strictly older by
+/// publish time) and project the fields the release-anomaly signal needs.
+///
+/// Prefers a stable (non-prerelease) predecessor so a stable release is diffed
+/// against the prior stable release rather than an intervening canary; falls
+/// back to any predecessor when the resolved version is itself a prerelease or
+/// no stable predecessor exists. Compares `time_map` values directly rather than
+/// trusting `all_versions` adjacency, whose lexicographic fallback is unreliable
+/// when some versions lack a publish time.
+fn select_previous_version(
+    raw: &serde_json::Value,
+    resolved: &str,
+    time_map: &HashMap<String, DateTime<Utc>>,
+) -> Option<PreviousVersion> {
+    let resolved_time = time_map.get(resolved)?;
+    let versions = raw.get("versions").and_then(|v| v.as_object())?;
+
+    let mut best: Option<(&String, &DateTime<Utc>)> = None;
+    let mut best_stable: Option<(&String, &DateTime<Utc>)> = None;
+    for (ver, t) in time_map.iter() {
+        // `time` carries "created"/"modified" keys and possibly versions absent
+        // from `versions`; only real, strictly-older versions are candidates.
+        if ver == resolved || t >= resolved_time || !versions.contains_key(ver) {
+            continue;
+        }
+        if best.map_or(true, |(_, bt)| t > bt) {
+            best = Some((ver, t));
+        }
+        if !is_prerelease(ver) && best_stable.map_or(true, |(_, bt)| t > bt) {
+            best_stable = Some((ver, t));
+        }
+    }
+
+    let (prev_ver, _) = if is_prerelease(resolved) {
+        best
+    } else {
+        best_stable.or(best)
+    }?;
+    let prev_obj = versions.get(prev_ver)?;
+    Some(PreviousVersion {
+        version: prev_ver.clone(),
+        scripts: extract_string_map(prev_obj, "scripts"),
+        dependencies: extract_string_map(prev_obj, "dependencies"),
     })
 }
 
