@@ -55,6 +55,12 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
     };
 
     // Newly-added install-time lifecycle scripts — the takeover fingerprint.
+    //
+    // A near-identical release that quietly introduces a preinstall/install/
+    // postinstall script is the canonical maintainer-takeover fingerprint.
+    // Scored at 70 so this signal ALONE reaches the block threshold, preserving
+    // v0.1.3's effective block behavior without double-counting via the
+    // lifecycle signal (which is suppressed when all present scripts are new).
     let added: Vec<&str> = LIFECYCLE_KEYS
         .iter()
         .filter(|k| meta.scripts.contains_key(**k) && !prev.scripts.contains_key(**k))
@@ -63,7 +69,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
     if !added.is_empty() {
         out.push(Signal {
             kind: SignalKind::ReleaseAnomaly,
-            points: 40,
+            points: 70,
             detail: format!(
                 "lifecycle script(s) added since {}: {} — not present in the previous release",
                 prev.version,
@@ -262,9 +268,32 @@ mod tests {
             Some(prev(&[], &[])),
         );
         let sigs = evaluate(&m);
-        let added = sigs.iter().find(|s| s.points == 40).expect("added-script");
+        let added = sigs.iter().find(|s| s.points == 70).expect("added-script");
         assert_eq!(added.kind, SignalKind::ReleaseAnomaly);
         assert!(added.detail.contains("postinstall"));
+    }
+
+    #[test]
+    fn newly_added_install_script_alone_reaches_block_tier() {
+        // Deterministic offline check: a release that adds a postinstall not
+        // present in the previous version must produce a score >= 70 from
+        // release_anomaly alone — no other signals involved.  This locks the
+        // block-tier weighting so a de-dup change cannot silently regress
+        // detection back to warn.
+        let m = meta(
+            &[("postinstall", "node ./setup.js")],
+            &[],
+            Some(prev(&[], &[])),
+        );
+        let sigs = evaluate(&m);
+        let total: u32 = sigs.iter().map(|s| s.points).sum();
+        assert!(
+            total >= 70,
+            "newly-added install script should reach block threshold (>=70) from \
+             release_anomaly alone; got total={} from {:?}",
+            total,
+            sigs
+        );
     }
 
     #[test]
