@@ -49,7 +49,10 @@ pub async fn evaluate(http: &reqwest::Client, meta: &PackageMetadata) -> Result<
     }
     let r: GhRepo = match resp.json().await {
         Ok(r) => r,
-        Err(_) => return Ok(Vec::new()),
+        Err(e) => {
+            tracing::warn!("github json parse: {}", e);
+            return Ok(Vec::new());
+        }
     };
     let mut sigs = Vec::new();
     if r.archived {
