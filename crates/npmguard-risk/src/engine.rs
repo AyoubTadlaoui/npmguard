@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use chrono::Utc;
+use std::sync::Arc;
 
 use crate::scoring::{compute_level, Thresholds};
 use crate::signals::{self, registry::NpmRegistryClient, PackageMetadata};
@@ -9,7 +10,9 @@ use crate::types::{PackageRef, RiskVerdict, SignalKind, SignalSetHash};
 
 pub struct RiskEngine {
     registry: NpmRegistryClient,
-    http: reqwest::Client,
+    /// Shared HTTP client. A single pool covers registry, OSV, and GitHub
+    /// calls — one set of connections, one timeout/UA configuration.
+    http: Arc<reqwest::Client>,
     thresholds: Thresholds,
     /// Active signal kinds, in evaluation order. Drives the cache hash.
     active: Vec<SignalKind>,
@@ -17,12 +20,14 @@ pub struct RiskEngine {
 
 impl RiskEngine {
     pub fn new() -> Result<Self> {
-        let http = reqwest::Client::builder()
-            .user_agent(concat!("npmguard/", env!("CARGO_PKG_VERSION")))
-            .timeout(std::time::Duration::from_secs(10))
-            .build()?;
+        let http = Arc::new(
+            reqwest::Client::builder()
+                .user_agent(concat!("npmguard/", env!("CARGO_PKG_VERSION")))
+                .timeout(std::time::Duration::from_secs(10))
+                .build()?,
+        );
         Ok(Self {
-            registry: NpmRegistryClient::new()?,
+            registry: NpmRegistryClient::with_client(Arc::clone(&http)),
             http,
             thresholds: Thresholds::default(),
             active: vec![

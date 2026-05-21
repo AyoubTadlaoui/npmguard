@@ -7,9 +7,14 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 const REGISTRY_BASE: &str = "https://registry.npmjs.org";
-const USER_AGENT: &str = concat!("npmguard/", env!("CARGO_PKG_VERSION"));
+
+/// Hard cap on registry packument response body size (16 MiB).
+/// Packuments for even the busiest monorepos top out well below this; anything
+/// larger is almost certainly a misconfigured proxy or an adversarial response.
+const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 
 /// Subset of the npm packument we care about. Many fields are intentionally
 /// untyped (`serde_json::Value`) — we only deserialize what we score on.
@@ -50,17 +55,16 @@ pub struct Maintainer {
 }
 
 pub struct NpmRegistryClient {
-    http: reqwest::Client,
+    /// Shared HTTP client — owned by the engine, borrowed here via `Arc` so
+    /// the entire workspace uses a single connection pool with uniform
+    /// timeout / User-Agent configuration.
+    http: Arc<reqwest::Client>,
 }
 
 impl NpmRegistryClient {
-    pub fn new() -> Result<Self> {
-        let http = reqwest::Client::builder()
-            .user_agent(USER_AGENT)
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .context("building reqwest client")?;
-        Ok(Self { http })
+    /// Construct a client that borrows the engine's shared `reqwest::Client`.
+    pub fn with_client(http: Arc<reqwest::Client>) -> Self {
+        Self { http }
     }
 
     /// Fetch the full packument and project it into `PackageMetadata` for the
@@ -78,7 +82,34 @@ impl NpmRegistryClient {
         if !resp.status().is_success() {
             anyhow::bail!("registry returned {} for {}", resp.status(), name);
         }
-        let raw: serde_json::Value = resp.json().await.context("parsing registry json")?;
+
+        // Guard against oversized responses before deserializing. A packument
+        // that exceeds the cap is either malformed or adversarial; bail loudly
+        // rather than materialising the whole body in memory.
+        if let Some(len) = resp.content_length() {
+            if len as usize > MAX_BODY_BYTES {
+                anyhow::bail!(
+                    "registry response for {} is {} bytes, exceeds {} MiB cap",
+                    name,
+                    len,
+                    MAX_BODY_BYTES / 1024 / 1024
+                );
+            }
+        }
+        let bytes = resp
+            .bytes()
+            .await
+            .with_context(|| format!("reading registry body for {}", name))?;
+        if bytes.len() > MAX_BODY_BYTES {
+            anyhow::bail!(
+                "registry response body for {} is {} bytes, exceeds {} MiB cap",
+                name,
+                bytes.len(),
+                MAX_BODY_BYTES / 1024 / 1024
+            );
+        }
+        let raw: serde_json::Value =
+            serde_json::from_slice(&bytes).context("parsing registry json")?;
         project_metadata(name, version, &raw)
     }
 }
