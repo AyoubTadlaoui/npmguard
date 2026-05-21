@@ -63,6 +63,7 @@ fn parse_signal_kind(s: &str) -> Option<SignalKind> {
         "KnownCve" => Some(SignalKind::KnownCve),
         "SoleMaintainer" => Some(SignalKind::SoleMaintainer),
         "Deprecated" => Some(SignalKind::Deprecated),
+        "ReleaseAnomaly" => Some(SignalKind::ReleaseAnomaly),
         _ => None,
     }
 }
