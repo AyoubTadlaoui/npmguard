@@ -31,9 +31,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
     // at least one script existed before, so lifecycle scores the unchanged
     // presence while release_anomaly scores the addition.
     if let Some(prev) = &meta.previous_version {
-        let all_are_new = present
-            .iter()
-            .all(|k| !prev.scripts.contains_key(*k));
+        let all_are_new = present.iter().all(|k| !prev.scripts.contains_key(*k));
         if all_are_new {
             // Every present lifecycle script is a newly-added one; the
             // release_anomaly signal covers this with +40.  Skip lifecycle
@@ -80,10 +78,7 @@ mod tests {
         }
     }
 
-    fn with_prev(
-        mut meta: PackageMetadata,
-        prev_scripts: &[(&str, &str)],
-    ) -> PackageMetadata {
+    fn with_prev(mut meta: PackageMetadata, prev_scripts: &[(&str, &str)]) -> PackageMetadata {
         meta.previous_version = Some(PreviousVersion {
             version: "0.9.0".into(),
             scripts: prev_scripts
@@ -150,10 +145,7 @@ mod tests {
         // release_anomaly fires for the addition; lifecycle fires for the
         // pre-existing script — they score different facts, no double-count.
         let m = with_prev(
-            meta_with_scripts(&[
-                ("preinstall", "old-cmd"),
-                ("postinstall", "new-cmd"),
-            ]),
+            meta_with_scripts(&[("preinstall", "old-cmd"), ("postinstall", "new-cmd")]),
             &[("preinstall", "old-cmd")],
         );
         let sigs = evaluate(&m);
