@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-05-21
+
 ### Added
 
 - **`ReleaseAnomaly` signal — the first piece of the v0.2 release-anomaly
@@ -16,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   predecessor (chosen by publish time, preferring the prior *stable* release)
   and flags the takeover fingerprint:
   - a **newly-added** `preinstall`/`install`/`postinstall` script not present
-    in the previous release (+40);
+    in the previous release (+70 — block-tier on its own; see Fixed below);
   - an obfuscated, high-entropy base64/hex payload embedded in an install-time
     script body (+30) — gated on length **and** Shannon entropy so ordinary
     commands like `node-gyp rebuild` don't trip it;
@@ -29,6 +31,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   pre-existing cached verdicts are recomputed automatically.
 
 ### Fixed
+
+- **Shared HTTP client; 16 MiB response-body cap.** All registry and OSV
+  fetches now share a single `Arc<Client>` built in the engine, rather than
+  each signal allocating its own. A 16 MiB per-response size limit is enforced
+  to prevent a malicious or oversized packument from exhausting heap memory.
+
+- **GitHub JSON parse errors logged instead of silently zeroing repo-health.**
+  A malformed or unexpected GitHub API response previously swallowed the error
+  and returned empty signals, masking problems in CI and making the score
+  silently optimistic for packages whose repo URL triggered a parse failure.
+
+- **Lifecycle and release-anomaly signals no longer double-count a
+  newly-added install script.** A takeover release that adds a fresh
+  `preinstall`/`install`/`postinstall` was previously scored by both the
+  `lifecycle` signal (+30) and the `release_anomaly` signal (+40), inflating
+  the composite score by 30 points beyond what either signal warranted alone.
+  The `lifecycle` signal is now suppressed when every present lifecycle script
+  is newly added in this release and `release_anomaly` already covers the
+  addition.
+
+- **Newly-added install script re-weighted to block-tier (40 → 70) to
+  preserve v0.1.3 detection.** Removing the double-count dropped the
+  effective score for a takeover-with-added-script release from 70 (block) to
+  40 (warn). The `release_anomaly` sub-signal for a newly-added install script
+  is now weighted at 70, so it reaches the block threshold on its own and
+  the de-dup carries no detection regression.
 
 - **Panic (process abort) on a multibyte deprecation message.** The
   `Deprecated` signal truncated long messages with `&msg[..120]` — a byte slice
@@ -151,6 +179,8 @@ MCP tool for AI coding agents.
 - Cross-platform release pipeline (macOS x86_64+arm64, Linux x86_64+arm64,
   Windows x86_64) via GitHub Actions matrix + SHA256SUMS.txt.
 
+[0.1.4]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.4
+[0.1.3]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.3
 [0.1.2]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.2
 [0.1.1]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.1
 [0.1.0]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.0
