@@ -116,7 +116,7 @@ A native pre-install risk gate for npm packages, with an MCP tool for AI coding 
 
 Single static Rust binary, distributed via GitHub Releases (not via npm), so the gate itself cannot be compromised by the npm supply chain it's protecting against.
 
-Exposes the same check as an MCP server so Claude Code / Cursor / Windsurf must go through the same gate when they install packages on the user's behalf. Catches the lodahs typosquat of lodash (in OSV's malware namespace) at score 115/200 against the live registry.
+Exposes the same check as an MCP server so Claude Code / Cursor / Codex must go through the same gate when they install packages on the user's behalf. Catches the lodahs typosquat of lodash (in OSV's malware namespace) at score 115/200 against the live registry.
 ```
 
 **MCP config snippet (if there's a JSON field):**
@@ -265,7 +265,7 @@ runs *before* `npm install` does:
   - returns ok / warn / block, with an exit code
 
 The piece I'm most interested in feedback on: it also ships as an MCP
-server, so Claude Code / Cursor / Windsurf must go through the same
+server, so Claude Code / Cursor / Codex must go through the same
 gate when *they* run `npm install` on your behalf. That's increasingly
 when `npm install` actually happens in 2026.
 
@@ -311,7 +311,7 @@ If they're ever compromised, you've made the problem worse.
 ```
 The wedge: npmguard also ships as an MCP server.
 
-Claude Code / Cursor / Windsurf must go through the same risk check when *they* run `npm install` on your behalf.
+Claude Code / Cursor / Codex must go through the same risk check when *they* run `npm install` on your behalf.
 
 That's increasingly when `npm install` actually happens in 2026.
 ```
@@ -361,7 +361,7 @@ Background: every existing pre-install checker for npm (npq, safe-npm, npm-risk)
 1. Pulls registry + OSV.dev + GitHub signals in parallel
 2. Scores composite risk (8 signals, documented weights, capped at 200)
 3. Returns ok / warn / block before lifecycle scripts can run
-4. Exposes the same check as an MCP tool, so Claude Code / Cursor / Windsurf are forced through the gate when they install packages
+4. Exposes the same check as an MCP tool, so Claude Code / Cursor / Codex are forced through the gate when they install packages
 
 Live example — `lodahs` (real npm typosquat of `lodash`, in OSV's malware namespace) blocks at score 115/200 with SoleMaintainer + Typosquat (Damerau-Levenshtein for adjacent-char swaps) + MAL-*.
 
@@ -379,7 +379,7 @@ Curious for feedback on the scoring weights and on whether the MCP gate is the r
 
 ### 9.1 — Title
 ```
-Show: npmguard — a single-binary risk gate that runs before `npm install` (with an MCP server for Claude Code / Cursor / Windsurf)
+Show: npmguard — a single-binary risk gate that runs before `npm install` (with an MCP server for Claude Code / Cursor / Codex)
 ```
 
 ### 9.2 — URL
@@ -399,7 +399,7 @@ Sample verdict against the real registry — `lodahs` (typosquat of `lodash`, in
        25 pts  Typosquat            name 'lodahs' is 1 edit away from popular package 'lodash'
        80 pts  KnownCve             1 CONFIRMED MALICIOUS by OSV for this version: MAL-2025-25502
 
-MCP integration is the part I think most matters for 2026 — Claude Code / Cursor / Windsurf run `npm install` autonomously, and there was no MCP gate for that until now.
+MCP integration is the part I think most matters for 2026 — Claude Code / Cursor / Codex run `npm install` autonomously, and there was no MCP gate for that until now.
 
 Repo: https://github.com/AyoubTadlaoui/npmguard
 v0.1.3 binaries (macOS/Linux/Windows): https://github.com/AyoubTadlaoui/npmguard/releases/latest
@@ -630,7 +630,7 @@ One-line DMs, no preamble.
 Hi — built an MCP server that wraps `npm install` risk scoring for Claude Code. Single binary, OSV-backed, blocks typosquats live. Would be glad to demo if it's relevant for the MCP examples or for any post-Shai-Hulud guidance you publish: github.com/AyoubTadlaoui/npmguard
 ```
 
-**Cursor/Windsurf maintainers (their public X handles):** same template, swap product name.
+**Cursor/Codex maintainers (their public X handles):** same template, swap product name.
 
 **Security-newsletter writers** (StepSecurity, Snyk security blog, Socket blog):
 ```

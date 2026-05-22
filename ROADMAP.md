@@ -24,7 +24,7 @@ If we can defend that sentence at v1.0, npmguard has earned its place.
   churn, sole maintainer, deprecated, typosquat, OSV.dev incl. MAL-*
   malware namespace, GitHub repo health).
 - CLI verdict (`ok` / `warn` / `block`).
-- MCP server so Claude Code / Cursor / Windsurf hit the same gate.
+- MCP server so Claude Code / Cursor / Codex hit the same gate.
 - SQLite verdict cache, ~5× speedup on repeat queries (v0.1.1).
 - Releases on macOS x86_64+arm64, Linux x86_64+arm64, Windows x86_64,
   SHA256-verified, distributed *outside* the npm ecosystem.
@@ -223,7 +223,7 @@ v0.2 first.
 - Freeze the MCP tool schema (`install_package` input/output) — additive
   changes only after this point.
 - Freeze the JSON output format of `npmguard check --json`.
-- Pursue placement in Claude Code / Cursor / Windsurf default MCP docs.
+- Pursue placement in Claude Code / Cursor / Codex default MCP docs.
 - Publish the corpus + scoring weights as a separate citable artifact.
 
 ---

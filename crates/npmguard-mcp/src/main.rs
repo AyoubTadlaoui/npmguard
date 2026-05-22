@@ -1,5 +1,5 @@
 //! npmguard-mcp — MCP server that exposes npmguard's risk evaluation as an
-//! `install_package` tool for AI coding assistants (Claude Code, Cursor, Windsurf).
+//! `install_package` tool for AI coding assistants (Claude Code, Cursor, Codex).
 //!
 //! Transport: stdio. The host launches this binary and speaks JSON-RPC over
 //! stdin/stdout per the Model Context Protocol spec.
