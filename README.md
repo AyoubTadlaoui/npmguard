@@ -1,10 +1,10 @@
 # npmguard
 
-> **A native pre-install risk gate for npm packages, with an MCP tool for AI coding agents.**
-> Pre-install risk scoring + MCP server, distributed outside the npm ecosystem so it can't be compromised by the thing it's protecting you from.
+**Your AI coding agent installs npm packages without asking. npmguard blocks the malicious ones before a single install script runs.**
 
-> [!NOTE]
-> **v0.1 is a risk checker + MCP verdict gate. It is not yet a real npm wrapper, installer, or sandbox.** `npmguard check` and `npmguard install` both produce a verdict; the actual `npm install` subprocess execution and cross-platform sandbox land in v0.2. See the roadmap below.
+Claude Code, Cursor, and Codex run `npm install` autonomously — no human pausing to ask "wait, is `supabase-mcp-helper` even real?" npmguard is an MCP server + CLI that scores every package (OSV malware data, typosquat/slopsquat, install-script analysis) and returns **block** before lifecycle scripts fire.
+
+Shipped as one Rust binary, *outside* npm — so the gate can't be poisoned by the supply chain it guards.
 
 [![CI](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml)
 [![Release](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml)
@@ -35,7 +35,7 @@ Existing defenses leave a specific gap:
 
 - **`npq`, `safe-npm` / `socket npm`, `npm-risk`** ship as **npm packages**. They run on the thing they're protecting you from. If the wrapper is ever compromised, you've made the problem worse.
 - **`pnpm v10+`, Bun** disable lifecycle scripts by default — but only for users who've moved off `npm`. The npm majority is unprotected.
-- **`npm audit`, Snyk, Dependabot, `lavamoat/allow-scripts`** are excellent at CVE scanning and allow-list management, but they're not a pre-install heuristic gate, and none of them gate AI coding assistants like Claude Code, Cursor, or Windsurf when *they* run `npm install` on your behalf.
+- **`npm audit`, Snyk, Dependabot, `lavamoat/allow-scripts`** are excellent at CVE scanning and allow-list management, but they're not a pre-install heuristic gate, and none of them gate AI coding assistants like Claude Code, Cursor, or Codex when *they* run `npm install` on your behalf.
 
 `npmguard` fills the specific gap of **pre-install risk scoring + AI-agent gate via MCP, shipped as a single binary outside npm**. Zero external dependencies at runtime beyond the registries it queries.
 
@@ -43,48 +43,107 @@ Existing defenses leave a specific gap:
 
 ## Install
 
-Pick whichever fits your machine:
+<details>
+<summary><strong>macOS (Apple Silicon — aarch64)</strong></summary>
 
 ```bash
-# macOS (Apple Silicon)
 curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-aarch64-apple-darwin.tar.gz
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-aarch64-apple-darwin.tar.gz
 tar -xzf npmguard.tar.gz
-sudo mv npmguard-v0.1.3-aarch64-apple-darwin/npmguard*  /usr/local/bin/
-
-# macOS (Intel)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-x86_64-apple-darwin.tar.gz
-
-# Linux (x86_64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
-
-# Linux (aarch64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
-
-# Windows (x86_64)
-#   https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.3-x86_64-pc-windows-msvc.zip
-
-# Build from source (any OS with Rust ≥ 1.75)
-cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard
-cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard-mcp
-
-# Prebuilt binaries
-#   https://github.com/AyoubTadlaoui/npmguard/releases
+# Edit the directory name below if the version has changed.
+sudo mv npmguard-v0.1.4-aarch64-apple-darwin/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.4-aarch64-apple-darwin/npmguard-mcp  /usr/local/bin/npmguard-mcp
 ```
 
-Every release ships a `SHA256SUMS.txt` — verify before extracting:
-
-```bash
-shasum -a 256 -c <(grep npmguard-v0.1.3-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
-```
-
-> **macOS:** if you downloaded the archive through a browser (not `curl`), macOS may flag the binary as untrusted (`"cannot be opened…"` or `Killed: 9`). Clear the quarantine attribute after extracting:
->
+> **Quarantine note:** if you downloaded through a browser rather than `curl`, macOS may flag the binary as untrusted (`"cannot be opened…"` or `Killed: 9`). Clear the attribute after extracting:
 > ```bash
 > xattr -dr com.apple.quarantine /usr/local/bin/npmguard /usr/local/bin/npmguard-mcp
 > ```
->
-> The `curl` instructions above avoid this — `curl` does not set the quarantine flag.
+> The `curl` path above avoids this — `curl` does not set the quarantine flag.
+
+</details>
+
+<details>
+<summary><strong>macOS (Intel — x86_64)</strong></summary>
+
+```bash
+curl -L -o npmguard.tar.gz \
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-x86_64-apple-darwin.tar.gz
+tar -xzf npmguard.tar.gz
+# Edit the directory name below if the version has changed.
+sudo mv npmguard-v0.1.4-x86_64-apple-darwin/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.4-x86_64-apple-darwin/npmguard-mcp  /usr/local/bin/npmguard-mcp
+```
+
+</details>
+
+<details>
+<summary><strong>Linux (x86_64)</strong></summary>
+
+```bash
+curl -L -o npmguard.tar.gz \
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-x86_64-unknown-linux-gnu.tar.gz
+tar -xzf npmguard.tar.gz
+# Edit the directory name below if the version has changed.
+sudo mv npmguard-v0.1.4-x86_64-unknown-linux-gnu/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.4-x86_64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/npmguard-mcp
+```
+
+</details>
+
+<details>
+<summary><strong>Linux (aarch64)</strong></summary>
+
+```bash
+curl -L -o npmguard.tar.gz \
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-aarch64-unknown-linux-gnu.tar.gz
+tar -xzf npmguard.tar.gz
+# Edit the directory name below if the version has changed.
+sudo mv npmguard-v0.1.4-aarch64-unknown-linux-gnu/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.4-aarch64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/npmguard-mcp
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (x86_64)</strong></summary>
+
+Download the zip from:
+```
+https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-x86_64-pc-windows-msvc.zip
+```
+Extract and place `npmguard-cli.exe` and `npmguard-mcp.exe` somewhere on your `%PATH%` — e.g. `C:\tools\`.
+
+> **Edit the version string** in the URL above if you want a specific release.
+
+</details>
+
+<details>
+<summary><strong>Build from source (Rust users)</strong></summary>
+
+Requires Rust 1.75 or later.
+
+```bash
+cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard-cli
+cargo install --git https://github.com/AyoubTadlaoui/npmguard --bin npmguard-mcp
+```
+
+After install, the CLI binary is named `npmguard-cli`; alias it if you prefer `npmguard`:
+```bash
+# bash / zsh
+echo 'alias npmguard=npmguard-cli' >> ~/.bashrc   # or ~/.zshrc
+```
+
+</details>
+
+Verify the download against the published checksums before extracting:
+
+```bash
+# Replace the filename to match your platform.
+shasum -a 256 -c <(grep npmguard-v0.1.4-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
+```
+
+All prebuilt binaries are listed on the [Releases page](https://github.com/AyoubTadlaoui/npmguard/releases). Homebrew tap, Scoop bucket, and `curl … | sh` installer land with **v0.2** alongside the sandbox layer.
 
 ### Docker (`npmguard-mcp` only)
 
@@ -94,8 +153,6 @@ docker run --rm -i ghcr.io/ayoubtadlaoui/npmguard-mcp:latest
 ```
 
 The Docker image is provided for MCP catalogs and CI; native binaries remain the recommended local install path. The image ships only the `npmguard-mcp` server (not the CLI), runs as a non-root user, and has no exposed ports — MCP hosts communicate over stdio.
-
-Homebrew tap, Scoop bucket, `curl ... | sh` installer, and AUR land with **v0.2** alongside the sandbox layer. See [DISTRIBUTION.md](DISTRIBUTION.md) (planned) for the full channel matrix.
 
 ---
 
@@ -140,7 +197,36 @@ All flags:
 
 ## Quickstart — MCP
 
-The `npmguard-mcp` binary speaks the Model Context Protocol over stdio. Add it to your MCP host's config (for Claude Code, that's `~/.claude.json`):
+`npmguard-mcp` speaks the Model Context Protocol over stdio. Once the binary is on your `PATH`, register it with your agent using the instructions for your tool below.
+
+### Claude Code
+
+Use the official `claude mcp add` CLI — no manual JSON editing required:
+
+```bash
+# Adds npmguard to your user-level config (~/.claude.json), available in all projects.
+claude mcp add --transport stdio --scope user npmguard -- /usr/local/bin/npmguard-mcp
+```
+
+Verify it registered:
+
+```bash
+claude mcp list
+```
+
+To scope it to a single project instead (stored in `.mcp.json` in the project root, safe to commit):
+
+```bash
+claude mcp add --transport stdio --scope project npmguard -- /usr/local/bin/npmguard-mcp
+```
+
+> **Reference:** [Claude Code MCP docs](https://code.claude.com/docs/en/mcp)
+
+### Cursor
+
+Add an `mcpServers` block to your config. Use the **global** file to enable it in every workspace, or the **project** file to scope it to one repo.
+
+**Global** (`~/.cursor/mcp.json`):
 
 ```json
 {
@@ -152,7 +238,42 @@ The `npmguard-mcp` binary speaks the Model Context Protocol over stdio. Add it t
 }
 ```
 
-It exposes one tool, `install_package(name, version?)`, returning a structured verdict the model can act on:
+**Project-scoped** (`.cursor/mcp.json` in the repo root):
+
+```json
+{
+  "mcpServers": {
+    "npmguard": {
+      "command": "/usr/local/bin/npmguard-mcp"
+    }
+  }
+}
+```
+
+> Edit the `command` path if you installed to a location other than `/usr/local/bin/`.
+>
+> **Reference:** [Cursor MCP docs](https://cursor.com/docs/mcp)
+
+### Codex CLI
+
+Codex supports stdio MCP servers via `~/.codex/config.toml`. Add a `[mcp_servers.npmguard]` table:
+
+```toml
+[mcp_servers.npmguard]
+command = "/usr/local/bin/npmguard-mcp"
+```
+
+To scope it to a single project, create `.codex/config.toml` in the repo root with the same block (only works in projects Codex has marked as trusted).
+
+> Edit the `command` path if you installed elsewhere.
+>
+> **Reference:** [Codex MCP docs](https://developers.openai.com/codex/mcp)
+
+---
+
+### What the MCP tool returns
+
+`npmguard-mcp` exposes one tool, `install_package(name, version?)`, returning a structured verdict the model can act on:
 
 ```json
 {
@@ -193,7 +314,33 @@ Composite score is the sum (capped at 200). Default thresholds: `warn ≥ 30`, `
 
 ---
 
-## What npmguard does NOT do
+## Versioning & releases
+
+npmguard follows [Semantic Versioning](https://semver.org/). While the project is `0.x`:
+
+- The CLI is treated as stable for end users — flag names and exit codes won't change without a major bump.
+- The MCP tool surface (`install_package` input/output schema) may make minor additive changes between `0.x` releases. Anything breaking is called out in [CHANGELOG.md](CHANGELOG.md).
+
+Tagged releases publish prebuilt binaries to the [Releases](https://github.com/AyoubTadlaoui/npmguard/releases) page (macOS x86_64 + arm64, Linux x86_64 + arm64, Windows x86_64) via a cross-platform GitHub Actions matrix.
+
+> [!NOTE]
+> **v0.1 is a risk checker + MCP verdict gate. It is not yet a real npm wrapper, installer, or sandbox.** `npmguard check` and `npmguard install` both produce a verdict; the actual `npm install` subprocess execution and cross-platform sandbox land in v0.2. See the roadmap below.
+
+Roadmap (full reasoning + considered-and-rejected scope in [ROADMAP.md](ROADMAP.md)):
+
+| Phase | Headline |
+|---|---|
+| **v0.1** (shipped) | Risk engine + CLI + MCP server + SQLite cache + GitHub Releases |
+| **v0.2** | Real `npm install` execution + per-OS sandbox + **release-anomaly engine** (per-version `package.json` diff) + Homebrew/Scoop/AUR/install.sh distribution |
+| **v0.3** | Provenance / signature verification + scanner adapters (`--with npm-audit`, `--with osv-lockfile`, `--with socket`) + SBOM generation |
+| **v0.4** | `npmguard.toml` policy file + CI mode + waivers |
+| **v0.5** | Organization presets + MCP marketplace placement (Claude Code, Cursor, Smithery) |
+| **v1.0** | Frozen Rust API, frozen MCP tool schema, frozen JSON output, integration into AI-assistant default docs |
+
+Runtime sandboxing (`npmguard run npm test`) is **deliberately out of scope** — see [ROADMAP.md § Considered and kept out of scope](ROADMAP.md#considered-and-kept-out-of-scope) for the reasoning.
+
+<details>
+<summary><strong>Scope limits (what v0.1 doesn't do yet)</strong></summary>
 
 Honesty is the contract.
 
@@ -208,29 +355,7 @@ What's still missing in v0.1:
 - **Doesn't replace `npm audit`, Snyk, Socket, Dependabot, or code review.** It's an additional layer. v0.3 adds `--with npm-audit` / `--with osv-lockfile` / `--with socket` adapters so npmguard becomes the policy gate on top of them rather than a redundant scanner.
 - Is **not** a guarantee. Any tool claiming "secure" is lying. This one says "reduces blast radius" and stops there.
 
----
-
-## Versioning & releases
-
-npmguard follows [Semantic Versioning](https://semver.org/). While the project is `0.x`:
-
-- The CLI is treated as stable for end users — flag names and exit codes won't change without a major bump.
-- The MCP tool surface (`install_package` input/output schema) may make minor additive changes between `0.x` releases. Anything breaking is called out in [CHANGELOG.md](CHANGELOG.md).
-
-Tagged releases publish prebuilt binaries to the [Releases](https://github.com/AyoubTadlaoui/npmguard/releases) page (macOS x86_64 + arm64, Linux x86_64 + arm64, Windows x86_64) via a cross-platform GitHub Actions matrix.
-
-Roadmap (full reasoning + considered-and-rejected scope in [ROADMAP.md](ROADMAP.md)):
-
-| Phase | Headline |
-|---|---|
-| **v0.1** (shipped) | Risk engine + CLI + MCP server + SQLite cache + GitHub Releases |
-| **v0.2** | Real `npm install` execution + per-OS sandbox + **release-anomaly engine** (per-version `package.json` diff) + Homebrew/Scoop/AUR/install.sh distribution |
-| **v0.3** | Provenance / signature verification + scanner adapters (`--with npm-audit`, `--with osv-lockfile`, `--with socket`) + SBOM generation |
-| **v0.4** | `npmguard.toml` policy file + CI mode + waivers |
-| **v0.5** | Organization presets + MCP marketplace placement (Claude Code, Cursor, Smithery) |
-| **v1.0** | Frozen Rust API, frozen MCP tool schema, frozen JSON output, integration into AI-assistant default docs |
-
-Runtime sandboxing (`npmguard run npm test`) is **deliberately out of scope** — see [ROADMAP.md § Considered and kept out of scope](ROADMAP.md#considered-and-kept-out-of-scope) for the reasoning.
+</details>
 
 ---
 
