@@ -173,7 +173,7 @@ MCP tool for AI coding agents.
 - **CLI** (`npmguard check|install`) with three verdicts (`ok` / `warn` /
   `block`), TTY-aware prompting, JSON output mode.
 - **MCP server** (`rmcp`, stdio transport) exposing `install_package` so
-  Claude Code / Cursor / Windsurf can route through the same gate.
+  Claude Code / Cursor / Codex can route through the same gate.
 - **SQLite verdict cache** at `~/.cache/npmguard/verdicts.db` keyed by signal
   set hash — present in v0.1.0 but the read path is wired in v0.1.1.
 - Cross-platform release pipeline (macOS x86_64+arm64, Linux x86_64+arm64,
