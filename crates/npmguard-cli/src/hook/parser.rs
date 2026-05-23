@@ -7,7 +7,7 @@
 //! # Scope limitations (v1)
 //!
 //! * Bare `npm install` (no package arguments) is treated as a lockfile
-//!   restore — it is NOT gated. This is a conscious v1 choice.
+//!   restore. It is NOT gated. This is a conscious v1 choice.
 //! * A sufficiently obfuscated or indirected command (shell variable expansion,
 //!   heredoc, eval, etc.) can evade the parser. Full enforcement requires the
 //!   v0.2 npm-wrapper + sandbox layer.
@@ -77,7 +77,7 @@ fn split_shell_fragments(cmd: &str) -> Vec<&str> {
                 start = i;
                 continue;
             }
-            // `||` — skip both characters so the next iteration sees clean input
+            // `||`: skip both characters so the next iteration sees clean input
             i += 2;
             continue;
         }
@@ -309,7 +309,7 @@ mod tests {
 
     #[test]
     fn npm_ci_returns_empty() {
-        // `npm ci` is a lockfile install — never gated in v1.
+        // `npm ci` is a lockfile install, never gated in v1.
         assert!(extract_packages("npm ci").is_empty());
     }
 
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn flags_only_returns_empty() {
-        // `npm install -D` with no package — treat as bare install.
+        // `npm install -D` with no package: treat as bare install.
         assert!(extract_packages("npm install -D").is_empty());
     }
 }

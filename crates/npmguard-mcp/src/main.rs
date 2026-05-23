@@ -1,4 +1,4 @@
-//! npmguard-mcp — MCP server that exposes npmguard's risk evaluation as an
+//! npmguard-mcp: MCP server that exposes npmguard's risk evaluation as an
 //! `install_package` tool for AI coding assistants (Claude Code, Cursor, Codex).
 //!
 //! Transport: stdio. The host launches this binary and speaks JSON-RPC over
@@ -83,12 +83,12 @@ impl Server {
         // Cache-aware path: fetch metadata, consult cache, full-evaluate on miss.
         let meta = self.engine.fetch_metadata(&pkg).await.map_err(|e| {
             // A pinned/unknown version (or missing package) is a client input
-            // problem, not a server fault — surface it as invalid_params with a
+            // problem, not a server fault; surface it as invalid_params with a
             // clear message instead of an opaque internal error.
             let full = format!("{:#}", e);
             // Both a missing version ("... not found in registry packument") and
             // a missing package (registry "returned 404") are client input
-            // problems, not server faults — surface them as invalid_params.
+            // problems, not server faults; surface them as invalid_params.
             if full.contains("not found in registry") || full.contains("returned 404") {
                 ErrorData::invalid_params(
                     format!(
@@ -140,11 +140,11 @@ impl Server {
                     "Safe to install. No risk signals detected.".to_string()
                 }
                 RiskLevel::Ok => format!(
-                    "Low risk — {} minor signal(s) detected, below the warning threshold. Likely safe to install; review the signals if this dependency is security-sensitive.",
+                    "Low risk: {} minor signal(s) detected, below the warning threshold. Likely safe to install; review the signals if this dependency is security-sensitive.",
                     verdict.signals.len()
                 ),
-                RiskLevel::Warn => "Warn — surface the signals to the user and get explicit approval before running `npm install`.".to_string(),
-                RiskLevel::Block => "Block — do NOT install this package without explicit user override. Present the signals and ask the user to confirm.".to_string(),
+                RiskLevel::Warn => "Warn: surface the signals to the user and get explicit approval before running `npm install`.".to_string(),
+                RiskLevel::Block => "Block: do NOT install this package without explicit user override. Present the signals and ask the user to confirm.".to_string(),
             },
         };
         let body = serde_json::to_string_pretty(&response)
@@ -169,7 +169,7 @@ impl ServerHandler for Server {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // stderr-only logging — stdio is reserved for MCP framing.
+    // stderr-only logging; stdio is reserved for MCP framing.
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_env_filter(

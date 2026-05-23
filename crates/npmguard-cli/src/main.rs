@@ -5,7 +5,7 @@
 //! the sandbox layer. Today, it tells you what would happen and exits.
 //!
 //! `hook` subcommand: deterministic Claude Code PreToolUse gate. The harness
-//! runs the hook binary — the model cannot skip it.
+//! runs the hook binary; the model cannot skip it.
 
 use std::io::{IsTerminal, Write};
 use std::process::ExitCode;
@@ -158,7 +158,7 @@ enum HookCommand {
     Handle,
 
     /// Install npmguard as a PreToolUse hook in the Claude Code settings file.
-    /// Idempotent — safe to run more than once.
+    /// Idempotent. Safe to run more than once.
     Install {
         /// Which settings file to target.
         #[arg(long, value_enum, default_value_t = hook::Scope::User)]

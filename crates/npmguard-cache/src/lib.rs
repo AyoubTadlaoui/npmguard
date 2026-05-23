@@ -43,7 +43,7 @@ pub struct VerdictCache {
 }
 
 /// Bump on any schema change. On version mismatch the table is dropped and
-/// recreated — verdicts are regenerable, so a clean slate beats migration
+/// recreated; verdicts are regenerable, so a clean slate beats migration
 /// gymnastics for this cache.
 const SCHEMA_VERSION: i32 = 2;
 
@@ -96,7 +96,7 @@ impl VerdictCache {
 
     /// Look up a verdict for the resolved (name, version, signal_set_hash).
     /// Returns None on miss, on stale entry, or on a schema mismatch. The
-    /// caller does not need to supply `published_at` — the cache reads it
+    /// caller does not need to supply `published_at`; the cache reads it
     /// from the stored row when picking a TTL.
     pub fn get(
         &self,
@@ -172,7 +172,7 @@ impl VerdictCache {
         Ok(())
     }
 
-    /// Drop every entry for a given package — call when a new registry
+    /// Drop every entry for a given package; call when a new registry
     /// version appears so the risk verdict is recomputed.
     pub fn invalidate(&self, name: &str) -> Result<usize> {
         let conn = self.lock()?;
@@ -195,7 +195,7 @@ fn init_schema(conn: &Connection) -> Result<()> {
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap_or(0);
     if current != SCHEMA_VERSION {
-        // Old or unknown schema — discard. Verdicts are regenerable.
+        // Old or unknown schema; discard. Verdicts are regenerable.
         conn.execute_batch("DROP TABLE IF EXISTS verdicts;")
             .context("dropping stale schema")?;
     }
@@ -298,7 +298,7 @@ mod tests {
             "h1",
             Some(Utc::now() - Duration::days(1)),
         );
-        // Pretend the verdict was fetched 1 hour ago — past fresh_ttl of 0s.
+        // Pretend the verdict was fetched 1 hour ago, past fresh_ttl of 0s.
         v.fetched_at = Utc::now() - Duration::hours(1);
         cache.put(&v).unwrap();
         let pkg = PackageRef::new("fresh-pkg", Some("0.0.1".into()));

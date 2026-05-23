@@ -1,4 +1,4 @@
-//! Deprecation signal — npm marks packages or versions as deprecated with a message.
+//! Deprecation signal: npm marks packages or versions as deprecated with a message.
 
 use crate::signals::registry::PackageMetadata;
 use crate::types::{Signal, SignalKind};
@@ -7,7 +7,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
     let Some(msg) = meta.deprecated.as_deref() else {
         return Vec::new();
     };
-    // Truncate on a char boundary, not a byte index — `msg` is attacker-
+    // Truncate on a char boundary, not a byte index. `msg` is attacker-
     // controlled registry JSON, and `&msg[..120]` panics (process abort under
     // `panic = "abort"`) when byte 120 lands inside a multibyte character.
     let truncated = if msg.chars().count() > 120 {

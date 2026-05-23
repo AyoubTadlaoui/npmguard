@@ -22,7 +22,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
 
     // Detect a recent prior version (within 14 days). We do NOT have per-version
     // maintainer history from the abbreviated packument, so this is a coarse
-    // proxy: "version published recently after a long-stable package" — combined
+    // proxy: "version published recently after a long-stable package," combined
     // with `age` signal it amplifies the warn.
     if let Some(current_pub) = meta.published_at {
         let prior_pub: Option<chrono::DateTime<Utc>> = meta

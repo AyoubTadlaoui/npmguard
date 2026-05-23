@@ -1,10 +1,10 @@
-//! `npmguard hook` — Claude Code PreToolUse gate.
+//! `npmguard hook`: Claude Code PreToolUse gate.
 //!
 //! Subcommands:
-//! * `handle` — read a PreToolUse JSON event from stdin, write a decision
+//! * `handle`: read a PreToolUse JSON event from stdin, write a decision
 //!   JSON to stdout. Run by Claude Code's harness; never by the model directly.
-//! * `install` — merge npmguard into the Claude Code settings file.
-//! * `uninstall` — remove only npmguard's hook entry, preserve everything else.
+//! * `install`: merge npmguard into the Claude Code settings file.
+//! * `uninstall`: remove only npmguard's hook entry, preserve everything else.
 
 pub mod decision;
 pub mod parser;
@@ -54,7 +54,7 @@ struct BashToolInput {
 
 /// Read one PreToolUse event from stdin, decide, write to stdout.
 ///
-/// Exit 0 in all cases — we communicate exclusively via the JSON response.
+/// Exit 0 in all cases; we communicate exclusively via the JSON response.
 /// The only fatal path is if we cannot write to stdout (which would mean the
 /// harness is broken regardless).
 pub async fn handle(no_cache: bool) -> Result<()> {
@@ -75,14 +75,14 @@ pub async fn handle(no_cache: bool) -> Result<()> {
 /// Pure decision computation from a raw JSON string. Extracted so tests can
 /// drive it without touching stdin/stdout.
 ///
-/// Always returns a valid `HookResponse` — errors are surfaced as `ask`
+/// Always returns a valid `HookResponse`; errors are surfaced as `ask`
 /// decisions, never as Rust errors propagated to the caller.
 pub async fn compute_response(raw: &str, no_cache: bool) -> HookResponse {
     // 1. Parse the event.
     let event: PreToolUseEvent = match serde_json::from_str(raw) {
         Ok(e) => e,
         Err(_) => {
-            // Unknown/malformed event — fail open (allow). We must never block
+            // Unknown/malformed event: fail open (allow). We must never block
             // unrelated Claude Code operations due to a parse failure.
             return HookResponse::allow();
         }
@@ -96,7 +96,7 @@ pub async fn compute_response(raw: &str, no_cache: bool) -> HookResponse {
     // 3. Extract the command string.
     let bash_input: BashToolInput = match serde_json::from_value(event.tool_input) {
         Ok(b) => b,
-        Err(_) => return HookResponse::allow(), // no command field — allow
+        Err(_) => return HookResponse::allow(), // no command field, allow
     };
 
     // 4. Parse the command for package-install invocations.
@@ -116,7 +116,7 @@ pub async fn compute_response(raw: &str, no_cache: bool) -> HookResponse {
                 .iter()
                 .map(|p| {
                     format!(
-                        "npmguard could not verify `{}` (engine init failed: {}) — proceed with caution",
+                        "npmguard could not verify `{}` (engine init failed: {}). Proceed with caution.",
                         p.spec, err
                     )
                 })

@@ -116,7 +116,7 @@ pub fn aggregate_decision(outcomes: &[PackageOutcome]) -> HookResponse {
             },
             PackageOutcome::Error { spec, message } => {
                 error_reasons.push(format!(
-                    "npmguard could not verify `{}` ({}) — proceed with caution",
+                    "npmguard could not verify `{}` ({}). Proceed with caution.",
                     spec, message
                 ));
             }
@@ -288,7 +288,7 @@ mod tests {
             .unwrap();
         assert!(reason.contains("unknown-pkg"));
         assert!(reason.contains("connection timeout"));
-        assert!(reason.contains("proceed with caution"));
+        assert!(reason.contains("Proceed with caution"));
     }
 
     #[test]

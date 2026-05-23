@@ -5,7 +5,7 @@
 //! an install-time lifecycle script, pulls in a new dependency, or smuggles an
 //! obfuscated payload inside an install script. The metadata-only signals
 //! (`lifecycle`, `age`) judge the resolved version in isolation; this signal
-//! diffs it against its immediate predecessor and flags what *changed* — which
+//! diffs it against its immediate predecessor and flags what *changed*, which
 //! catches a "looks normal" takeover release far better than any single-version
 //! check. See ROADMAP.md ("release-anomaly engine").
 //!
@@ -40,7 +40,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
     let mut out = Vec::new();
 
     // Obfuscation runs on the resolved version's install scripts regardless of
-    // whether a predecessor exists — an obfuscated payload in a first release
+    // whether a predecessor exists; an obfuscated payload in a first release
     // is no less dangerous than one introduced by a takeover.
     if let Some(detail) = obfuscated_install_script(&meta.scripts) {
         out.push(Signal {
@@ -54,7 +54,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
         return out;
     };
 
-    // Newly-added install-time lifecycle scripts — the takeover fingerprint.
+    // Newly-added install-time lifecycle scripts: the takeover fingerprint.
     //
     // A near-identical release that quietly introduces a preinstall/install/
     // postinstall script is the canonical maintainer-takeover fingerprint.
@@ -71,7 +71,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
             kind: SignalKind::ReleaseAnomaly,
             points: 70,
             detail: format!(
-                "lifecycle script(s) added since {}: {} — not present in the previous release",
+                "lifecycle script(s) added since {}: {} (not present in the previous release)",
                 prev.version,
                 added.join(", ")
             ),
@@ -141,7 +141,7 @@ fn obfuscated_install_script(scripts: &HashMap<String, String>) -> Option<String
         };
         if let Some(len) = longest_encoded_blob(body) {
             return Some(format!(
-                "`{}` script contains a {}-char high-entropy blob — possible obfuscated payload",
+                "`{}` script contains a {}-char high-entropy blob, possible obfuscated payload",
                 key, len
             ));
         }
@@ -277,7 +277,7 @@ mod tests {
     fn newly_added_install_script_alone_reaches_block_tier() {
         // Deterministic offline check: a release that adds a postinstall not
         // present in the previous version must produce a score >= 70 from
-        // release_anomaly alone — no other signals involved.  This locks the
+        // release_anomaly alone; no other signals involved.  This locks the
         // block-tier weighting so a de-dup change cannot silently regress
         // detection back to warn.
         let m = meta(
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn preexisting_lifecycle_script_is_not_re_flagged_as_added() {
-        // Script was already there in the previous release — not an anomaly.
+        // Script was already there in the previous release; not an anomaly.
         let m = meta(
             &[("postinstall", "node-gyp rebuild")],
             &[],
@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn obfuscated_payload_in_install_script_is_flagged() {
-        // A long, high-entropy base64 blob piped into a shell — classic
+        // A long, high-entropy base64 blob piped into a shell: classic
         // second-stage smuggling.
         let blob = "ZXZhbCgnY29uc29sZS5sb2coMSknKTtyZXF1aXJlKCdjaGlsZF9wcm9jZXNzJykuZXhlYygnY3VybCBodHRwOi8vZXZpbCcp";
         assert!(blob.len() >= BLOB_MIN_LEN);

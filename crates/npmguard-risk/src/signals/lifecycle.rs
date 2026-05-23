@@ -1,7 +1,7 @@
 //! Lifecycle script signals.
 //!
 //! npm runs `preinstall`, `install`, and `postinstall` automatically. These are
-//! the primary attack vector in Shai-Hulud-style incidents — code in any of
+//! the primary attack vector in Shai-Hulud-style incidents; code in any of
 //! these executes the moment a downstream project runs `npm install`.
 
 use crate::signals::registry::PackageMetadata;
@@ -27,7 +27,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
     // Suppression condition: there is a previous version AND all currently
     // present lifecycle keys were absent from it (i.e. every script is newly
     // added this release).  A package that had a pre-existing install script
-    // AND added a new one in this release falls outside this condition —
+    // AND added a new one in this release falls outside this condition;
     // at least one script existed before, so lifecycle scores the unchanged
     // presence while release_anomaly scores the addition.
     if let Some(prev) = &meta.previous_version {
@@ -41,7 +41,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
     }
 
     // 30 points if any pre-existing lifecycle scripts are present.
-    // We do not weight by count — one bad script is enough.
+    // We do not weight by count; one bad script is enough.
     let detail = format!(
         "lifecycle scripts present: {} (these run automatically on npm install)",
         present.join(", ")
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn postinstall_triggers_signal_when_no_previous_version() {
-        // No previous version present — no suppression applies.
+        // No previous version present; no suppression applies.
         let m = meta_with_scripts(&[("postinstall", "node ./build.js")]);
         let sigs = evaluate(&m);
         assert_eq!(sigs.len(), 1);
@@ -143,7 +143,7 @@ mod tests {
     fn mixed_old_and_new_scripts_still_scores() {
         // One script pre-existed, one was added in this release.
         // release_anomaly fires for the addition; lifecycle fires for the
-        // pre-existing script — they score different facts, no double-count.
+        // pre-existing script; they score different facts, no double-count.
         let m = with_prev(
             meta_with_scripts(&[("preinstall", "old-cmd"), ("postinstall", "new-cmd")]),
             &[("preinstall", "old-cmd")],
