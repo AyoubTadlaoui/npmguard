@@ -3,6 +3,9 @@
 //! v0.1 scope: `check` and `install` both compute a risk verdict and surface it.
 //! `install` will gain real `npm install` subprocess execution in v0.2 along with
 //! the sandbox layer. Today, it tells you what would happen and exits.
+//!
+//! `hook` subcommand: deterministic Claude Code PreToolUse gate. The harness
+//! runs the hook binary — the model cannot skip it.
 
 use std::io::{IsTerminal, Write};
 use std::process::ExitCode;
@@ -14,6 +17,8 @@ use owo_colors::OwoColorize;
 
 use npmguard_cache::VerdictCache;
 use npmguard_risk::{PackageRef, RiskEngine, RiskLevel, RiskVerdict, Thresholds};
+
+mod hook;
 
 /// Color enablement, decided once at startup. Bare `.bold()`/`.red()` calls
 /// from `owo_colors` always emit ANSI; we gate them through the `color` module
@@ -134,6 +139,38 @@ enum Command {
         #[arg(long)]
         yes: bool,
     },
+
+    /// Claude Code PreToolUse hook management.
+    ///
+    /// `hook handle` is called by the Claude Code harness on every Bash tool
+    /// invocation. It reads a PreToolUse JSON event from stdin and writes a
+    /// permission decision JSON to stdout. The model cannot skip this gate.
+    Hook {
+        #[command(subcommand)]
+        sub: HookCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum HookCommand {
+    /// Gate called by the Claude Code harness. Reads PreToolUse JSON from
+    /// stdin; writes a decision JSON to stdout.
+    Handle,
+
+    /// Install npmguard as a PreToolUse hook in the Claude Code settings file.
+    /// Idempotent — safe to run more than once.
+    Install {
+        /// Which settings file to target.
+        #[arg(long, value_enum, default_value_t = hook::Scope::User)]
+        scope: hook::Scope,
+    },
+
+    /// Remove only npmguard's hook entry from the Claude Code settings file.
+    /// All other settings and hooks are preserved.
+    Uninstall {
+        #[arg(long, value_enum, default_value_t = hook::Scope::User)]
+        scope: hook::Scope,
+    },
 }
 
 fn main() -> ExitCode {
@@ -178,6 +215,25 @@ fn main() -> ExitCode {
 }
 
 async fn run(cli: Cli) -> Result<i32> {
+    // The `hook handle` subcommand is a special path: it owns stdin/stdout and
+    // must produce machine-readable JSON. Skip the normal engine/cache setup.
+    if let Command::Hook { sub } = &cli.command {
+        match sub {
+            HookCommand::Handle => {
+                hook::handle(cli.no_cache).await?;
+                return Ok(0);
+            }
+            HookCommand::Install { scope } => {
+                hook::install(*scope)?;
+                return Ok(0);
+            }
+            HookCommand::Uninstall { scope } => {
+                hook::uninstall(*scope)?;
+                return Ok(0);
+            }
+        }
+    }
+
     let engine = RiskEngine::new()?;
     let cache = if cli.no_cache {
         None
@@ -195,6 +251,7 @@ async fn run(cli: Cli) -> Result<i32> {
     let (packages, install_mode, auto_yes) = match cli.command {
         Command::Check { packages } => (packages, false, false),
         Command::Install { packages, yes } => (packages, true, yes),
+        Command::Hook { .. } => unreachable!("handled above"),
     };
 
     let mut worst: i32 = 0;
