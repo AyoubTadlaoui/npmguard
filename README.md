@@ -48,11 +48,11 @@ That last one is the specific thing I wanted to fix: **pre-install risk scoring 
 
 ```bash
 curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-aarch64-apple-darwin.tar.gz
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.5-aarch64-apple-darwin.tar.gz
 tar -xzf npmguard.tar.gz
 # Edit the directory name below if the version has changed.
-sudo mv npmguard-v0.1.4-aarch64-apple-darwin/npmguard-cli  /usr/local/bin/npmguard
-sudo mv npmguard-v0.1.4-aarch64-apple-darwin/npmguard-mcp  /usr/local/bin/npmguard-mcp
+sudo mv npmguard-v0.1.5-aarch64-apple-darwin/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.5-aarch64-apple-darwin/npmguard-mcp  /usr/local/bin/npmguard-mcp
 ```
 
 > **Quarantine note:** if you downloaded through a browser rather than `curl`, macOS may flag the binary as untrusted (`"cannot be opened…"` or `Killed: 9`). Clear the attribute after extracting:
@@ -68,11 +68,11 @@ sudo mv npmguard-v0.1.4-aarch64-apple-darwin/npmguard-mcp  /usr/local/bin/npmgua
 
 ```bash
 curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-x86_64-apple-darwin.tar.gz
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.5-x86_64-apple-darwin.tar.gz
 tar -xzf npmguard.tar.gz
 # Edit the directory name below if the version has changed.
-sudo mv npmguard-v0.1.4-x86_64-apple-darwin/npmguard-cli  /usr/local/bin/npmguard
-sudo mv npmguard-v0.1.4-x86_64-apple-darwin/npmguard-mcp  /usr/local/bin/npmguard-mcp
+sudo mv npmguard-v0.1.5-x86_64-apple-darwin/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.5-x86_64-apple-darwin/npmguard-mcp  /usr/local/bin/npmguard-mcp
 ```
 
 </details>
@@ -82,11 +82,11 @@ sudo mv npmguard-v0.1.4-x86_64-apple-darwin/npmguard-mcp  /usr/local/bin/npmguar
 
 ```bash
 curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-x86_64-unknown-linux-gnu.tar.gz
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.5-x86_64-unknown-linux-gnu.tar.gz
 tar -xzf npmguard.tar.gz
 # Edit the directory name below if the version has changed.
-sudo mv npmguard-v0.1.4-x86_64-unknown-linux-gnu/npmguard-cli  /usr/local/bin/npmguard
-sudo mv npmguard-v0.1.4-x86_64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/npmguard-mcp
+sudo mv npmguard-v0.1.5-x86_64-unknown-linux-gnu/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.5-x86_64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/npmguard-mcp
 ```
 
 </details>
@@ -96,11 +96,11 @@ sudo mv npmguard-v0.1.4-x86_64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/np
 
 ```bash
 curl -L -o npmguard.tar.gz \
-  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-aarch64-unknown-linux-gnu.tar.gz
+  https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.5-aarch64-unknown-linux-gnu.tar.gz
 tar -xzf npmguard.tar.gz
 # Edit the directory name below if the version has changed.
-sudo mv npmguard-v0.1.4-aarch64-unknown-linux-gnu/npmguard-cli  /usr/local/bin/npmguard
-sudo mv npmguard-v0.1.4-aarch64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/npmguard-mcp
+sudo mv npmguard-v0.1.5-aarch64-unknown-linux-gnu/npmguard-cli  /usr/local/bin/npmguard
+sudo mv npmguard-v0.1.5-aarch64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/npmguard-mcp
 ```
 
 </details>
@@ -110,7 +110,7 @@ sudo mv npmguard-v0.1.4-aarch64-unknown-linux-gnu/npmguard-mcp  /usr/local/bin/n
 
 Download the zip from:
 ```
-https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-x86_64-pc-windows-msvc.zip
+https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.5-x86_64-pc-windows-msvc.zip
 ```
 Extract and place `npmguard-cli.exe` and `npmguard-mcp.exe` somewhere on your `%PATH%`, e.g. `C:\tools\`.
 
@@ -140,7 +140,7 @@ Verify the download against the published checksums before extracting:
 
 ```bash
 # Replace the filename to match your platform.
-shasum -a 256 -c <(grep npmguard-v0.1.4-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
+shasum -a 256 -c <(grep npmguard-v0.1.5-aarch64-apple-darwin.tar.gz SHA256SUMS.txt)
 ```
 
 All prebuilt binaries are listed on the [Releases page](https://github.com/AyoubTadlaoui/npmguard/releases). Homebrew tap, Scoop bucket, and `curl … | sh` installer land with **v0.2** alongside the sandbox layer.
