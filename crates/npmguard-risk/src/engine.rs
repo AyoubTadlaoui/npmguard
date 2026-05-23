@@ -40,6 +40,7 @@ impl RiskEngine {
                 SignalKind::KnownCve,
                 SignalKind::Deprecated,
                 SignalKind::ReleaseAnomaly,
+                SignalKind::SecurityHolding,
             ],
         })
     }
@@ -79,6 +80,7 @@ impl RiskEngine {
         signals.extend(signals::maintainers::evaluate(&meta));
         signals.extend(signals::deprecated::evaluate(&meta));
         signals.extend(signals::release_anomaly::evaluate(&meta));
+        signals.extend(signals::security_holding::evaluate(&meta));
         signals.extend(signals::typosquat::evaluate(pkg));
 
         // Network-dependent signals; run concurrently.

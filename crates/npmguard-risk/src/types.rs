@@ -94,6 +94,10 @@ pub enum SignalKind {
     /// newly-added install scripts, new dependencies, an obfuscated payload.
     /// The maintainer-takeover fingerprint.
     ReleaseAnomaly,
+    /// The resolved version is an npm security-holding placeholder (an
+    /// `X.Y.Z-security` stub npm publishes after removing a package, almost
+    /// always following malware). Installing it resolves to a dead stub.
+    SecurityHolding,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

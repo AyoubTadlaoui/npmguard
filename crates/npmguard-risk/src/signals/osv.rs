@@ -14,7 +14,10 @@ const USER_AGENT: &str = concat!("npmguard/", env!("CARGO_PKG_VERSION"));
 #[derive(Serialize)]
 struct OsvQuery<'a> {
     package: OsvPackage<'a>,
-    version: &'a str,
+    // Omitted entirely for a package-level query. OSV treats a missing
+    // `version` as "return every advisory for this package".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -51,12 +54,41 @@ pub async fn evaluate(
     pkg: &PackageRef,
     resolved_version: &str,
 ) -> Result<Vec<Signal>> {
+    // Two queries, run concurrently:
+    //  * versioned     - OSV server-side matches the resolved version against
+    //                    advisory ranges. Authoritative for both CVEs and
+    //                    malware that actually affect this version.
+    //  * package-level - no version, so OSV returns every advisory for the
+    //                    name. Used as a malware fallback ONLY when the resolved
+    //                    version is a prerelease: semver range matching excludes
+    //                    a prerelease (e.g. an npm `-security` takedown stub)
+    //                    from an `introduced: 0` range, silently dropping a
+    //                    whole-package MAL advisory on the versioned query.
+    let (versioned, package_level) = futures::future::join(
+        query(http, &pkg.name, Some(resolved_version)),
+        query(http, &pkg.name, None),
+    )
+    .await;
+    let versioned = versioned?;
+    let package_level = package_level?;
+    // A prerelease tag is a `-` in the version core (build metadata uses `+`).
+    let resolved_is_prerelease = resolved_version.contains('-');
+    Ok(classify(&versioned, &package_level, resolved_is_prerelease)
+        .into_iter()
+        .collect())
+}
+
+/// Issue a single OSV `/v1/query`. `version = None` is a package-level query
+/// (every advisory for the package); `Some(v)` asks OSV to match `v` against
+/// advisory ranges. Best-effort: a non-2xx response is logged and treated as
+/// "no advisories" rather than blocking the caller.
+async fn query(http: &reqwest::Client, name: &str, version: Option<&str>) -> Result<Vec<OsvVuln>> {
     let body = OsvQuery {
         package: OsvPackage {
-            name: &pkg.name,
+            name,
             ecosystem: "npm",
         },
-        version: resolved_version,
+        version,
     };
     let resp = http
         .post(OSV_QUERY_URL)
@@ -66,57 +98,99 @@ pub async fn evaluate(
         .await
         .context("posting to osv.dev")?;
     if !resp.status().is_success() {
-        // OSV is best-effort. Surface as a soft failure rather than blocking.
-        tracing::warn!("osv.dev returned {} for {}", resp.status(), pkg.display());
+        tracing::warn!("osv.dev returned {} for {}", resp.status(), name);
         return Ok(Vec::new());
     }
     let parsed: OsvResponse = resp.json().await.context("parsing osv response")?;
-    if parsed.vulns.is_empty() {
-        return Ok(Vec::new());
-    }
-    // OSV's `MAL-*` namespace is the malicious-package database. Anything in
-    // that namespace is confirmed-malicious by OSV, not a vulnerability in
-    // a legitimate package, and warrants an immediate block regardless of
-    // any CVSS string.
-    let malicious = parsed
-        .vulns
-        .iter()
-        .any(|v| v.id.starts_with("MAL-") || v.id.starts_with("OSV-MAL-"));
+    Ok(parsed.vulns)
+}
 
-    let max_severity = parsed.vulns.iter().map(severity_rank).max().unwrap_or(0);
-    let points = if malicious {
-        // Single-signal block; see scoring::Thresholds::default (block = 70).
-        80
-    } else {
-        match max_severity {
-            4 => 50, // critical
-            3 => 20, // high
-            2 => 10, // medium
-            _ => 5,  // low / unknown
+/// Pure decision over OSV results.
+///
+/// OSV's `MAL-*` namespace is the malicious-package database: a hit confirms
+/// malware, not a flaw in a legitimate package, and blocks regardless of CVSS.
+/// A MAL advisory matched to the resolved version (the versioned query) is
+/// authoritative. We additionally honor a package-level MAL hit ONLY when the
+/// resolved version is a prerelease, because OSV's semver matching wrongly
+/// excludes prereleases from open-ended ranges (the `-security` takedown-stub
+/// case). We must NOT blanket-trust package-level MAL for a normal version: a
+/// legitimate package compromised only in specific, since-removed versions has
+/// a clean current version that must never be labelled malicious.
+///
+/// Absent malware, fall back to the worst CVE severity in the version-matched
+/// set, so an advisory that does not affect the resolved version cannot inflate
+/// the score.
+fn classify(
+    versioned: &[OsvVuln],
+    package_level: &[OsvVuln],
+    resolved_is_prerelease: bool,
+) -> Option<Signal> {
+    fn is_malware(v: &OsvVuln) -> bool {
+        v.id.starts_with("MAL-") || v.id.starts_with("OSV-MAL-")
+    }
+    // The versioned query is authoritative; the package-level query is a
+    // prerelease-only fallback (see the doc comment above).
+    let mut mal_sources: Vec<&OsvVuln> = versioned.iter().filter(|v| is_malware(v)).collect();
+    if resolved_is_prerelease {
+        mal_sources.extend(package_level.iter().filter(|v| is_malware(v)));
+    }
+    let mut mal_ids: Vec<&str> = Vec::new();
+    for v in mal_sources {
+        if !mal_ids.contains(&v.id.as_str()) {
+            mal_ids.push(v.id.as_str());
         }
+    }
+    if !mal_ids.is_empty() {
+        let shown = mal_ids
+            .iter()
+            .take(3)
+            .copied()
+            .collect::<Vec<_>>()
+            .join(", ");
+        let extra = if mal_ids.len() > 3 {
+            format!(" (+{} more)", mal_ids.len() - 3)
+        } else {
+            String::new()
+        };
+        return Some(Signal {
+            kind: SignalKind::KnownCve,
+            // Single-signal block; see scoring::Thresholds::default (block = 70).
+            points: 80,
+            detail: format!(
+                "{} confirmed malicious by OSV: {}{}",
+                mal_ids.len(),
+                shown,
+                extra
+            ),
+        });
+    }
+
+    if versioned.is_empty() {
+        return None;
+    }
+    let max_severity = versioned.iter().map(severity_rank).max().unwrap_or(0);
+    let points = match max_severity {
+        4 => 50, // critical
+        3 => 20, // high
+        2 => 10, // medium
+        _ => 5,  // low / unknown
     };
-    let ids: Vec<&str> = parsed.vulns.iter().map(|v| v.id.as_str()).take(3).collect();
-    let extra = if parsed.vulns.len() > 3 {
-        format!(" (+{} more)", parsed.vulns.len() - 3)
+    let ids: Vec<&str> = versioned.iter().map(|v| v.id.as_str()).take(3).collect();
+    let extra = if versioned.len() > 3 {
+        format!(" (+{} more)", versioned.len() - 3)
     } else {
         String::new()
     };
-    let label = if malicious {
-        "CONFIRMED MALICIOUS by OSV"
-    } else {
-        "known advisories"
-    };
-    Ok(vec![Signal {
+    Some(Signal {
         kind: SignalKind::KnownCve,
         points,
         detail: format!(
-            "{} {} for this version: {}{}",
-            parsed.vulns.len(),
-            label,
+            "{} known advisories for this version: {}{}",
+            versioned.len(),
             ids.join(", "),
             extra
         ),
-    }])
+    })
 }
 
 fn severity_rank(v: &OsvVuln) -> u8 {
@@ -269,6 +343,78 @@ mod tests {
             }],
             database_specific: serde_json::Value::Null,
         })
+    }
+
+    fn vuln(id: &str) -> OsvVuln {
+        OsvVuln {
+            id: id.into(),
+            severity: vec![],
+            database_specific: serde_json::Value::Null,
+        }
+    }
+
+    fn cve(score: &str) -> OsvVuln {
+        OsvVuln {
+            id: "CVE-x".into(),
+            severity: vec![OsvSeverity {
+                severity_type: "CVSS_V3".into(),
+                score: score.into(),
+            }],
+            database_specific: serde_json::Value::Null,
+        }
+    }
+
+    #[test]
+    fn prerelease_malware_in_package_level_blocks_when_versioned_empty() {
+        // The lodahs regression: the resolved version is a `-security`
+        // prerelease, so OSV's versioned query returns nothing, but the
+        // package-level query surfaces the MAL advisory. Because the resolved
+        // version is a prerelease, we honor it and block.
+        let sig = classify(&[], &[vuln("MAL-2025-25502")], true).expect("malware signal");
+        assert_eq!(sig.kind, SignalKind::KnownCve);
+        assert_eq!(sig.points, 80);
+        assert!(sig.detail.contains("MAL-2025-25502"));
+        assert!(sig.detail.contains("malicious"));
+    }
+
+    #[test]
+    fn package_level_malware_does_not_block_a_clean_normal_version() {
+        // The create-glee-app regression: a legitimate package was compromised
+        // only in specific, since-removed versions. Its clean current (non
+        // prerelease) version must NOT be labelled malicious just because a MAL
+        // advisory exists for the name at package level.
+        assert!(classify(&[], &[vuln("MAL-2025-190767")], false).is_none());
+    }
+
+    #[test]
+    fn malware_in_versioned_set_blocks_regardless_of_prerelease() {
+        // A MAL advisory matched to the resolved version is authoritative.
+        assert_eq!(
+            classify(&[vuln("OSV-MAL-1")], &[], false)
+                .expect("malware signal")
+                .points,
+            80
+        );
+    }
+
+    #[test]
+    fn versioned_cve_ranks_by_severity_not_malware() {
+        let sig = classify(&[cve("7.5")], &[], false).expect("cve signal");
+        assert_eq!(sig.kind, SignalKind::KnownCve);
+        assert_eq!(sig.points, 20); // high
+        assert!(sig.detail.contains("known advisories"));
+    }
+
+    #[test]
+    fn package_level_cve_does_not_inflate_score() {
+        // A non-malware advisory present only at package level (OSV did not
+        // match it to the resolved version) must not be scored as affecting it.
+        assert!(classify(&[], &[cve("9.8")], true).is_none());
+    }
+
+    #[test]
+    fn no_advisories_anywhere_is_none() {
+        assert!(classify(&[], &[], false).is_none());
     }
 
     #[test]
