@@ -75,8 +75,8 @@ pub async fn evaluate(
         return Ok(Vec::new());
     }
     // OSV's `MAL-*` namespace is the malicious-package database. Anything in
-    // that namespace is confirmed-malicious by OSV — not a vulnerability in
-    // a legitimate package — and warrants an immediate block regardless of
+    // that namespace is confirmed-malicious by OSV, not a vulnerability in
+    // a legitimate package, and warrants an immediate block regardless of
     // any CVSS string.
     let malicious = parsed
         .vulns
@@ -85,7 +85,7 @@ pub async fn evaluate(
 
     let max_severity = parsed.vulns.iter().map(severity_rank).max().unwrap_or(0);
     let points = if malicious {
-        // Single-signal block — see scoring::Thresholds::default (block = 70).
+        // Single-signal block; see scoring::Thresholds::default (block = 70).
         80
     } else {
         match max_severity {
@@ -121,7 +121,7 @@ pub async fn evaluate(
 
 fn severity_rank(v: &OsvVuln) -> u8 {
     // OSV's `severity[].score` for a `CVSS_V3` entry is the full vector string
-    // (e.g. `CVSS:3.1/AV:N/...`), NOT a leading number — so a naive
+    // (e.g. `CVSS:3.1/AV:N/...`), NOT a leading number; a naive
     // `split('/').next().parse()` always fails and silently under-scores real
     // criticals. Compute the base score from the vector; also accept a bare
     // numeric score from sources that store one. Take the max across entries.
@@ -171,7 +171,7 @@ fn severity_rank(v: &OsvVuln) -> u8 {
 /// Returns `None` for anything that is not a recognizable v3 base vector
 /// (a v2/v4 vector, or one missing a required base metric). Used only to bucket
 /// severity into 4 coarse levels, so the simplified one-decimal roundup is more
-/// than accurate enough — the result is well within the 2-point bucket gaps.
+/// than accurate enough; the result is well within the 2-point bucket gaps.
 fn cvss_v3_base_score(vector: &str) -> Option<f32> {
     if !vector.starts_with("CVSS:3") {
         return None;

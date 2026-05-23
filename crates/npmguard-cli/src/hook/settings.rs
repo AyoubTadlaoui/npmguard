@@ -1,7 +1,7 @@
 //! Read-merge-write helpers for Claude Code `settings.json` hook management.
 //!
 //! The invariants this module upholds:
-//! * Installing is idempotent — calling `install` twice does not duplicate
+//! * Installing is idempotent: calling `install` twice does not duplicate
 //!   the hook entry.
 //! * Uninstalling only removes npmguard's own hook entry; every other setting
 //!   and hook is preserved exactly as found.
@@ -54,7 +54,7 @@ pub fn install(settings_path: &Path) -> Result<String> {
 
     if is_already_installed(&root, &cmd) {
         return Ok(format!(
-            "npmguard hook already present in {} — nothing changed.",
+            "npmguard hook already present in {}. Nothing changed.",
             settings_path.display()
         ));
     }
@@ -77,7 +77,7 @@ pub fn uninstall(settings_path: &Path) -> Result<String> {
 
     if !settings_path.exists() {
         return Ok(format!(
-            "{} does not exist — nothing to remove.",
+            "{} does not exist. Nothing to remove.",
             settings_path.display()
         ));
     }
@@ -94,7 +94,7 @@ pub fn uninstall(settings_path: &Path) -> Result<String> {
         ))
     } else {
         Ok(format!(
-            "No npmguard hook found in {} — nothing changed.",
+            "No npmguard hook found in {}. Nothing changed.",
             settings_path.display()
         ))
     }
@@ -156,7 +156,7 @@ fn is_already_installed(root: &Value, cmd: &str) -> bool {
 /// This function is idempotent: if a hook entry with the same command is
 /// already present it is not duplicated.
 fn inject_hook(root: &mut Value, cmd: &str) {
-    // Guard: already present — nothing to do.
+    // Guard: already present, nothing to do.
     if is_already_installed(root, cmd) {
         return;
     }
@@ -190,7 +190,7 @@ fn inject_hook(root: &mut Value, cmd: &str) {
                 }
             }
         }
-        // No Bash block yet — append a new one.
+        // No Bash block yet; append a new one.
         blocks.push(json!({
             "matcher": MATCHER,
             "hooks": [new_hook]

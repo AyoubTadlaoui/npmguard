@@ -90,7 +90,7 @@ pub enum SignalKind {
     KnownCve,
     SoleMaintainer,
     Deprecated,
-    /// What changed between this version and its immediate predecessor —
+    /// What changed between this version and its immediate predecessor:
     /// newly-added install scripts, new dependencies, an obfuscated payload.
     /// The maintainer-takeover fingerprint.
     ReleaseAnomaly,

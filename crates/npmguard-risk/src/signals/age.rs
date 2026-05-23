@@ -19,7 +19,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
             kind: SignalKind::PackageAge,
             points: 25,
             detail: format!(
-                "version published {} day(s) ago — under 7d",
+                "version published {} day(s) ago, under 7d",
                 age.num_days().max(0)
             ),
         }]
@@ -27,10 +27,7 @@ pub fn evaluate(meta: &PackageMetadata) -> Vec<Signal> {
         vec![Signal {
             kind: SignalKind::PackageAge,
             points: 10,
-            detail: format!(
-                "version published {} day(s) ago — under 30d",
-                age.num_days()
-            ),
+            detail: format!("version published {} day(s) ago, under 30d", age.num_days()),
         }]
     } else {
         Vec::new()

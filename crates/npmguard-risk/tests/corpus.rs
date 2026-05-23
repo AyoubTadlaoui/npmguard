@@ -1,7 +1,7 @@
 //! Corpus integration test.
 //!
 //! Live network test. Hits registry.npmjs.org + OSV.dev + api.github.com.
-//! Skipped by default — run with `NPMGUARD_CORPUS=1 cargo test --test corpus -- --nocapture`.
+//! Skipped by default. Run with `NPMGUARD_CORPUS=1 cargo test --test corpus -- --nocapture`.
 //!
 //! Pass criteria:
 //! - Every entry in `known-good.json` resolves to a verdict that is NOT `Block`.
@@ -140,7 +140,7 @@ async fn known_bad_corpus_surfaces_expected_signals() {
                 }
             }
             Err(err) => {
-                // Unpublished / 404 is acceptable — that IS a confirmed-bad signal.
+                // Unpublished / 404 is acceptable; that IS a confirmed-bad signal.
                 eprintln!("  ok (unresolvable): {}@{}: {}", e.name, e.version, err);
             }
         }

@@ -17,7 +17,7 @@ const REGISTRY_BASE: &str = "https://registry.npmjs.org";
 const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 
 /// Subset of the npm packument we care about. Many fields are intentionally
-/// untyped (`serde_json::Value`) — we only deserialize what we score on.
+/// untyped (`serde_json::Value`); we only deserialize what we score on.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PackageMetadata {
     pub name: String,
@@ -31,7 +31,7 @@ pub struct PackageMetadata {
     pub deprecated: Option<String>,
     /// All known version strings, sorted by publish time descending if available.
     pub all_versions: Vec<String>,
-    /// publish time for *each* version (ISO8601) — used to detect ownership-churn windows.
+    /// publish time for *each* version (ISO8601), used to detect ownership-churn windows.
     pub time_map: HashMap<String, DateTime<Utc>>,
     /// The version published immediately before the resolved one (by publish
     /// time), projected for release-to-release diffing. `None` when the resolved
@@ -55,7 +55,7 @@ pub struct Maintainer {
 }
 
 pub struct NpmRegistryClient {
-    /// Shared HTTP client — owned by the engine, borrowed here via `Arc` so
+    /// Shared HTTP client, owned by the engine, borrowed here via `Arc` so
     /// the entire workspace uses a single connection pool with uniform
     /// timeout / User-Agent configuration.
     http: Arc<reqwest::Client>,

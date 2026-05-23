@@ -11,7 +11,7 @@ use crate::types::{PackageRef, RiskVerdict, SignalKind, SignalSetHash};
 pub struct RiskEngine {
     registry: NpmRegistryClient,
     /// Shared HTTP client. A single pool covers registry, OSV, and GitHub
-    /// calls — one set of connections, one timeout/UA configuration.
+    /// calls: one set of connections, one timeout/UA configuration.
     http: Arc<reqwest::Client>,
     thresholds: Thresholds,
     /// Active signal kinds, in evaluation order. Drives the cache hash.
@@ -81,7 +81,7 @@ impl RiskEngine {
         signals.extend(signals::release_anomaly::evaluate(&meta));
         signals.extend(signals::typosquat::evaluate(pkg));
 
-        // Network-dependent signals — run concurrently.
+        // Network-dependent signals; run concurrently.
         let osv_fut = signals::osv::evaluate(&self.http, pkg, &meta.resolved_version);
         let gh_fut = signals::github::evaluate(&self.http, &meta);
         let (osv_res, gh_res) = futures::future::join(osv_fut, gh_fut).await;

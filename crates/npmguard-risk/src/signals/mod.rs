@@ -1,7 +1,7 @@
 //! Signal modules.
 //!
 //! Each module produces zero or more `Signal` entries from package metadata or
-//! external sources. Signals are additive — the composite score is the sum of
+//! external sources. Signals are additive; the composite score is the sum of
 //! all signal points.
 
 pub mod age;
