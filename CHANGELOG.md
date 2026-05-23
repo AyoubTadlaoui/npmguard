@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-05-23
+
+### Added
+- `SecurityHolding` signal. When npm removes a package, almost always after malware, it republishes the name as an `X.Y.Z-security` placeholder. npmguard now flags any resolved version ending in `-security` as a block-tier signal, with no network lookup required.
+
+### Changed
+- OSV malware matching is now version-aware. A `MAL-*` advisory matched to the resolved version blocks it. For a prerelease resolved version (such as a `-security` takedown stub), where OSV's semver matching wrongly excludes the version from open-ended advisory ranges, npmguard also honors a package-level malware advisory. A normal version is never labelled malicious for an advisory that only affects other, since-removed versions, so a legitimate package that was compromised in a now-removed version is not flagged at its clean current version.
+
+### Fixed
+- Confirmed-malicious packages whose resolved version is an npm `-security` placeholder (for example `lodahs`) were scored warn instead of block. They now block, via both the security-holding signal and the OSV malware lookup.
+
 ## [0.1.5] - 2026-05-23
 
 ### Added

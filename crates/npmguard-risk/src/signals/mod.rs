@@ -12,6 +12,7 @@ pub mod maintainers;
 pub mod osv;
 pub mod registry;
 pub mod release_anomaly;
+pub mod security_holding;
 pub mod typosquat;
 
 pub use registry::{NpmRegistryClient, PackageMetadata};
