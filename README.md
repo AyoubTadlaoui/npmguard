@@ -1,19 +1,19 @@
 # npmguard
 
-**Your AI coding agent installs npm packages without asking. npmguard blocks the malicious ones before a single install script runs.**
+**I built this because my AI coding agent kept installing npm packages without asking. npmguard screens them before a single install script runs.**
 
-Claude Code, Cursor, and Codex run `npm install` autonomously — no human pausing to ask "wait, is `supabase-mcp-helper` even real?" npmguard is an MCP server + CLI that scores every package (OSV malware data, typosquat/slopsquat, install-script analysis) and returns **block** before lifecycle scripts fire.
+Claude Code, Cursor, and Codex run `npm install` autonomously. Nobody pauses to ask "wait, is `supabase-mcp-helper` even real?" I built npmguard as an MCP server and CLI that scores every package (OSV malware data, typosquat/slopsquat, install-script analysis) and returns a verdict before lifecycle scripts fire.
 
-Shipped as one Rust binary, *outside* npm — so the gate can't be poisoned by the supply chain it guards.
+It ships as one Rust binary, *outside* npm. That matters: the gate cant be poisoned by the supply chain its guarding.
 
 [![CI](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/ci.yml)
 [![Release](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml/badge.svg)](https://github.com/AyoubTadlaoui/npmguard/actions/workflows/release.yml)
 [![Latest release](https://img.shields.io/github/v/release/AyoubTadlaoui/npmguard)](https://github.com/AyoubTadlaoui/npmguard/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-![Claude Code refusing to install `lodahs` — a confirmed-malicious typosquat (OSV MAL-2025-25502) — through npmguard's MCP gate. Real session, atlas-ragnarok theme.](docs/hero-claude.webp)
+![Claude Code refusing to install lodahs, a confirmed-malicious typosquat (OSV MAL-2025-25502), through npmguard's MCP gate. Real session, atlas-ragnarok theme.](docs/hero-claude.webp)
 
-`npmguard install lodahs` — a real typosquat of `lodash`, refused before lifecycle scripts can run:
+`npmguard install lodahs` is a real typosquat of `lodash`, refused before lifecycle scripts can run:
 
 <!--
   Animated WebP renders as an <img> tag, which GitHub's README sanitizer
@@ -21,30 +21,30 @@ Shipped as one Rust binary, *outside* npm — so the gate can't be poisoned by t
   browser including Safari. The MP4 and GIF copies are kept alongside
   for downloads (links below the image).
 -->
-![npmguard refusing to install a typosquat — atlas-ragnarok theme](docs/demo.webp)
+![npmguard refusing to install a typosquat, atlas-ragnarok theme](docs/demo.webp)
 
-<sub>Also available as [GIF](docs/demo.gif) or [MP4](docs/demo.mp4). Live verdict against the npm registry — `lodahs` is in OSV's malware namespace (`MAL-2025-25502`). Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok). Regenerate with `sh docs/_theme/gen.sh` (needs `vhs`, `ffmpeg`, `webp`, `pillow`, `numpy`).</sub>
+<sub>Also available as [GIF](docs/demo.gif) or [MP4](docs/demo.mp4). Live verdict against the npm registry. `lodahs` is in OSV's malware namespace (`MAL-2025-25502`). Theme: [atlas-ragnarok](https://github.com/AyoubTadlaoui/atlas-ragnarok). Regenerate with `sh docs/_theme/gen.sh` (needs `vhs`, `ffmpeg`, `webp`, `pillow`, `numpy`).</sub>
 
 ---
 
 ## Why
 
-Across 2025–2026 the npm ecosystem absorbed a series of worm-style supply chain attacks that ran inside `preinstall` / `install` / `postinstall` scripts the moment a downstream user ran `npm install` — Shai-Hulud (Sep 2025), SHA1-Hulud (Nov 2025), the Axios compromise (Mar 2026), Mini Shai-Hulud (May 2026). Defender wins or loses **before the install completes**, not after.
+Between 2025 and 2026 the npm ecosystem got hit by a string of worm-style supply chain attacks: Shai-Hulud (Sep 2025), SHA1-Hulud (Nov 2025), the Axios compromise (Mar 2026), Mini Shai-Hulud (May 2026). All of them ran inside `preinstall` / `install` / `postinstall` scripts the moment someone ran `npm install`. You win or lose before the install completes, not after.
 
-Existing defenses leave a specific gap:
+The existing tools dont cover the gap I was staring at:
 
-- **`npq`, `safe-npm` / `socket npm`, `npm-risk`** ship as **npm packages**. They run on the thing they're protecting you from. If the wrapper is ever compromised, you've made the problem worse.
-- **`pnpm v10+`, Bun** disable lifecycle scripts by default — but only for users who've moved off `npm`. The npm majority is unprotected.
-- **`npm audit`, Snyk, Dependabot, `lavamoat/allow-scripts`** are excellent at CVE scanning and allow-list management, but they're not a pre-install heuristic gate, and none of them gate AI coding assistants like Claude Code, Cursor, or Codex when *they* run `npm install` on your behalf.
+- **`npq`, `safe-npm` / `socket npm`, `npm-risk`** ship as **npm packages**. They run on the exact thing they're supposed to protect you from. If the wrapper gets compromised, you've made the situation worse.
+- **`pnpm v10+`, Bun** disable lifecycle scripts by default, but only if you've already moved off `npm`. The npm majority is still exposed.
+- **`npm audit`, Snyk, Dependabot, `lavamoat/allow-scripts`** do CVE scanning and allow-list management well. What they dont do is act as a pre-install heuristic gate, and none of them intercept AI coding assistants like Claude Code, Cursor, or Codex when *they* run `npm install` on your behalf.
 
-`npmguard` fills the specific gap of **pre-install risk scoring + AI-agent gate via MCP, shipped as a single binary outside npm**. Zero external dependencies at runtime beyond the registries it queries.
+That last one is the specific thing I wanted to fix: **pre-install risk scoring that also gates AI agents, shipped as a single binary outside npm**. Zero runtime dependencies beyond the registries it queries.
 
 ---
 
 ## Install
 
 <details>
-<summary><strong>macOS (Apple Silicon — aarch64)</strong></summary>
+<summary><strong>macOS (Apple Silicon, aarch64)</strong></summary>
 
 ```bash
 curl -L -o npmguard.tar.gz \
@@ -59,12 +59,12 @@ sudo mv npmguard-v0.1.4-aarch64-apple-darwin/npmguard-mcp  /usr/local/bin/npmgua
 > ```bash
 > xattr -dr com.apple.quarantine /usr/local/bin/npmguard /usr/local/bin/npmguard-mcp
 > ```
-> The `curl` path above avoids this — `curl` does not set the quarantine flag.
+> The `curl` path above avoids this; `curl` does not set the quarantine flag.
 
 </details>
 
 <details>
-<summary><strong>macOS (Intel — x86_64)</strong></summary>
+<summary><strong>macOS (Intel, x86_64)</strong></summary>
 
 ```bash
 curl -L -o npmguard.tar.gz \
@@ -112,7 +112,7 @@ Download the zip from:
 ```
 https://github.com/AyoubTadlaoui/npmguard/releases/latest/download/npmguard-v0.1.4-x86_64-pc-windows-msvc.zip
 ```
-Extract and place `npmguard-cli.exe` and `npmguard-mcp.exe` somewhere on your `%PATH%` — e.g. `C:\tools\`.
+Extract and place `npmguard-cli.exe` and `npmguard-mcp.exe` somewhere on your `%PATH%`, e.g. `C:\tools\`.
 
 > **Edit the version string** in the URL above if you want a specific release.
 
@@ -152,11 +152,11 @@ docker pull ghcr.io/ayoubtadlaoui/npmguard-mcp:latest
 docker run --rm -i ghcr.io/ayoubtadlaoui/npmguard-mcp:latest
 ```
 
-The Docker image is provided for MCP catalogs and CI; native binaries remain the recommended local install path. The image ships only the `npmguard-mcp` server (not the CLI), runs as a non-root user, and has no exposed ports — MCP hosts communicate over stdio.
+The Docker image is mainly there for MCP catalogs and CI. For local use, install the native binary. The image ships only `npmguard-mcp` (not the CLI), runs as a non-root user, and has no exposed ports. MCP hosts communicate over stdio.
 
 ---
 
-## Quickstart — CLI
+## Quickstart: CLI
 
 ```bash
 # Evaluate the latest version, no install.
@@ -195,13 +195,13 @@ All flags:
 
 ---
 
-## Quickstart — MCP
+## Quickstart: MCP
 
 `npmguard-mcp` speaks the Model Context Protocol over stdio. Once the binary is on your `PATH`, register it with your agent using the instructions for your tool below.
 
 ### Claude Code
 
-Use the official `claude mcp add` CLI — no manual JSON editing required:
+Use the official `claude mcp add` CLI. No manual JSON editing required:
 
 ```bash
 # Adds npmguard to your user-level config (~/.claude.json), available in all projects.
@@ -286,26 +286,26 @@ To scope it to a single project, create `.codex/config.toml` in the repo root wi
     { "kind": "Typosquat", "points": 25, "detail": "name 'lodahs' is 1 edit away from popular package 'lodash'" },
     { "kind": "KnownCve", "points": 80, "detail": "1 CONFIRMED MALICIOUS by OSV for this version: MAL-2025-25502" }
   ],
-  "recommendation": "Block — do NOT install this package without explicit user override. Present the signals and ask the user to confirm."
+  "recommendation": "Block: do NOT install this package without explicit user override. Present the signals and ask the user to confirm."
 }
 ```
 
-The model gets the recommendation in its own message, so even if the user said *"just install whatever you need"*, the assistant has the structured signal to stop and ask.
+The model gets the recommendation in its own message. So even if the user said *"just install whatever you need"*, the assistant has the structured signal to stop and ask.
 
 ---
 
 ## Deterministic enforcement (Claude Code hook)
 
-### MCP is advisory — the hook is not
+### MCP is advisory. The hook is not.
 
-The MCP integration (`npmguard-mcp`) lets Claude Code *ask* npmguard before installing a package. This works well: the model sees the risk verdict and can act on it. But it is still advisory — the model decides whether to call the tool, and an inattentive or jailbroken model can skip it.
+The MCP integration (`npmguard-mcp`) lets Claude Code *ask* npmguard before installing a package. It works well: the model sees the risk verdict and can act on it. But it is still advisory. The model decides whether to call the tool, and an inattentive or jailbroken model can skip it.
 
-The `hook` subcommand is different. Claude Code's harness runs PreToolUse hooks automatically on every Bash tool call **before the command executes**. The model has no say: it cannot skip, bypass, or talk its way around a hook. This is what makes "blocks AI agents" true rather than aspirational.
+The `hook` subcommand is different. Claude Code's harness runs PreToolUse hooks automatically on every Bash tool call **before the command executes**. The model has no say. It cant skip, bypass, or talk its way around a hook. That's what makes the blocking real rather than aspirational.
 
 ### Setup (one command)
 
 ```bash
-# Installs into ~/.claude/settings.json — active in every Claude Code project.
+# Installs into ~/.claude/settings.json, active in every Claude Code project.
 npmguard hook install
 
 # Or scope it to a single project (writes .claude/settings.json in the cwd).
@@ -323,15 +323,15 @@ npmguard hook uninstall --scope project
 
 ### What the hook does
 
-1. Claude Code wants to run a Bash command — e.g. `npm install some-package`.
+1. Claude Code wants to run a Bash command, e.g. `npm install some-package`.
 2. The harness sends the command to `npmguard hook handle` via stdin (JSON).
 3. npmguard parses the command for package-install invocations. Non-install commands (`ls`, `git`, `npm run build`, etc.) are passed through immediately with no network call.
 4. For each detected package, the existing risk engine runs (same signals, same scoring as `npmguard check`).
 5. npmguard writes a decision JSON to stdout:
-   - **block verdict** → `deny` — Claude Code refuses the command and tells the model why.
-   - **warn verdict** → `ask` — Claude Code surfaces the signals and asks the user to confirm.
-   - **ok verdict** → `allow` — command proceeds silently.
-   - **network error** → `ask` with a caution message — never a silent allow on an unverified package; never a hard deny on an infra failure.
+   - **block verdict** → `deny`: Claude Code refuses the command and tells the model why.
+   - **warn verdict** → `ask`: Claude Code surfaces the signals and asks the user to confirm.
+   - **ok verdict** → `allow`: command proceeds silently.
+   - **network error** → `ask` with a caution message. Never a silent allow on an unverified package, never a hard deny on an infra failure.
 
 ### Honest limitations
 
@@ -360,7 +360,7 @@ npmguard hook uninstall --scope project
 
 Composite score is the sum (capped at 200). Default thresholds: `warn ≥ 30`, `block ≥ 70`. Tunable per project via config (planned for v0.2).
 
-**Weights are starting values, not science.** They will be tuned against [`corpus/`](corpus/) and the values published as part of each release. PRs welcome.
+**Weights are starting values, not science.** They'll be tuned against [`corpus/`](corpus/) and published as part of each release. PRs welcome.
 
 ---
 
@@ -368,7 +368,7 @@ Composite score is the sum (capped at 200). Default thresholds: `warn ≥ 30`, `
 
 npmguard follows [Semantic Versioning](https://semver.org/). While the project is `0.x`:
 
-- The CLI is treated as stable for end users — flag names and exit codes won't change without a major bump.
+- The CLI is treated as stable for end users. Flag names and exit codes wont change without a major bump.
 - The MCP tool surface (`install_package` input/output schema) may make minor additive changes between `0.x` releases. Anything breaking is called out in [CHANGELOG.md](CHANGELOG.md).
 
 Tagged releases publish prebuilt binaries to the [Releases](https://github.com/AyoubTadlaoui/npmguard/releases) page (macOS x86_64 + arm64, Linux x86_64 + arm64, Windows x86_64) via a cross-platform GitHub Actions matrix.
@@ -387,21 +387,21 @@ Roadmap (full reasoning + considered-and-rejected scope in [ROADMAP.md](ROADMAP.
 | **v0.5** | Organization presets + MCP marketplace placement (Claude Code, Cursor, Smithery) |
 | **v1.0** | Frozen Rust API, frozen MCP tool schema, frozen JSON output, integration into AI-assistant default docs |
 
-Runtime sandboxing (`npmguard run npm test`) is **deliberately out of scope** — see [ROADMAP.md § Considered and kept out of scope](ROADMAP.md#considered-and-kept-out-of-scope) for the reasoning.
+Runtime sandboxing (`npmguard run npm test`) is **deliberately out of scope**. See [ROADMAP.md § Considered and kept out of scope](ROADMAP.md#considered-and-kept-out-of-scope) for the reasoning.
 
 <details>
 <summary><strong>Scope limits (what v0.1 doesn't do yet)</strong></summary>
 
 Honesty is the contract.
 
-> **npmguard cannot prove packages are safe.** It can stop known-malicious packages (OSV `MAL-*`), flag typosquats, surface lifecycle scripts / package age / maintainer churn, and route AI coding agents through the same verdict. That's it. Everything below is what the v1.0 sentence will eventually add — see [ROADMAP.md](ROADMAP.md).
+> **npmguard cannot prove packages are safe.** It can stop known-malicious packages (OSV `MAL-*`), flag typosquats, surface lifecycle scripts / package age / maintainer churn, and route AI coding agents through the same verdict. That's it. Everything below is what v1.0 will eventually add. See [ROADMAP.md](ROADMAP.md).
 
 What's still missing in v0.1:
 
-- **Doesn't catch attacks that pass all heuristic checks.** The `ReleaseAnomaly` signal now diffs each version against its predecessor and flags the common takeover fingerprint — a newly-added install script, a new dependency, or an obfuscated install-script payload. But a takeover that subtly edits the *contents* of an existing install script without an obvious high-entropy blob, or one that ships malice in plain imported code, can still slip through. The remaining v0.2 answer is wrapping the real `npm install` and sandboxing the scripts that do run.
-- **Doesn't yet verify npm provenance / package signatures.** A historical provenance attestation suddenly missing is a strong takeover signal — that lands in v0.3.
+- **Doesn't catch attacks that pass all heuristic checks.** The `ReleaseAnomaly` signal now diffs each version against its predecessor and flags the common takeover fingerprint: a newly-added install script, a new dependency, or an obfuscated install-script payload. But a takeover that subtly edits the *contents* of an existing install script without an obvious high-entropy blob, or one that ships malice in plain imported code, can still slip through. The remaining v0.2 answer is wrapping the real `npm install` and sandboxing the scripts that do run.
+- **Doesn't yet verify npm provenance / package signatures.** A historical provenance attestation suddenly missing is a strong takeover signal. That lands in v0.3.
 - **Doesn't yet sandbox lifecycle scripts or wrap the real `npm install` subprocess.** v0.1 surfaces the verdict and stops; v0.2 ships the sandbox (landlock / sandbox-exec / Job Object) + `--ignore-scripts` enforcement + per-script allow-list.
-- **Doesn't protect against malicious code that runs *at import time*, not install time.** If a package is benign at install but evil when imported, this tool isn't in the path. That's a runtime-sandbox problem and is **deliberately out of scope** — see ROADMAP.md.
+- **Doesn't protect against malicious code that runs *at import time*, not install time.** If a package is benign at install but evil when imported, this tool isn't in the path. That's a runtime-sandbox problem and is **deliberately out of scope**. See ROADMAP.md.
 - **Doesn't replace `npm audit`, Snyk, Socket, Dependabot, or code review.** It's an additional layer. v0.3 adds `--with npm-audit` / `--with osv-lockfile` / `--with socket` adapters so npmguard becomes the policy gate on top of them rather than a redundant scanner.
 - Is **not** a guarantee. Any tool claiming "secure" is lying. This one says "reduces blast radius" and stops there.
 
@@ -426,12 +426,12 @@ Open the PR once that's clean.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ---
 
 ### About the author
 
-**Ayoub Tadlaoui** — *Atlas Kaisar* — a problem-solver from Morocco, building software since 2016.
+**Ayoub Tadlaoui** (*Atlas Kaisar*). From Morocco, building software since 2016.
 
 > "High performance knows no part-time commitment."
