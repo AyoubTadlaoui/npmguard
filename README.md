@@ -294,6 +294,56 @@ The model gets the recommendation in its own message, so even if the user said *
 
 ---
 
+## Deterministic enforcement (Claude Code hook)
+
+### MCP is advisory — the hook is not
+
+The MCP integration (`npmguard-mcp`) lets Claude Code *ask* npmguard before installing a package. This works well: the model sees the risk verdict and can act on it. But it is still advisory — the model decides whether to call the tool, and an inattentive or jailbroken model can skip it.
+
+The `hook` subcommand is different. Claude Code's harness runs PreToolUse hooks automatically on every Bash tool call **before the command executes**. The model has no say: it cannot skip, bypass, or talk its way around a hook. This is what makes "blocks AI agents" true rather than aspirational.
+
+### Setup (one command)
+
+```bash
+# Installs into ~/.claude/settings.json — active in every Claude Code project.
+npmguard hook install
+
+# Or scope it to a single project (writes .claude/settings.json in the cwd).
+npmguard hook install --scope project
+```
+
+Then **restart Claude Code** (or reload the window). From that point on, every Bash command Claude Code tries to run passes through `npmguard hook handle` first.
+
+To remove the hook:
+
+```bash
+npmguard hook uninstall          # user-level
+npmguard hook uninstall --scope project
+```
+
+### What the hook does
+
+1. Claude Code wants to run a Bash command — e.g. `npm install some-package`.
+2. The harness sends the command to `npmguard hook handle` via stdin (JSON).
+3. npmguard parses the command for package-install invocations. Non-install commands (`ls`, `git`, `npm run build`, etc.) are passed through immediately with no network call.
+4. For each detected package, the existing risk engine runs (same signals, same scoring as `npmguard check`).
+5. npmguard writes a decision JSON to stdout:
+   - **block verdict** → `deny` — Claude Code refuses the command and tells the model why.
+   - **warn verdict** → `ask` — Claude Code surfaces the signals and asks the user to confirm.
+   - **ok verdict** → `allow` — command proceeds silently.
+   - **network error** → `ask` with a caution message — never a silent allow on an unverified package; never a hard deny on an infra failure.
+
+### Honest limitations
+
+| Limitation | Status |
+|---|---|
+| **Claude Code only.** Cursor and Codex do not yet ship a comparable pre-tool hook API. They remain advisory-MCP only until they do. | v1 |
+| **Bare `npm install` (no package args) is not gated.** A lockfile restore (`npm install` with no arguments) is treated as pass-through. Only commands with explicit package names are checked. | v1 |
+| **Parser-level evasion is possible.** A determined or obfuscated command (`eval`, shell variable expansion, heredoc, etc.) can evade the command parser. Full enforcement requires the v0.2 npm-wrapper + sandbox layer that wraps `npm` itself rather than parsing shell strings. | v1 |
+| **Only npm / yarn / pnpm are recognised.** `bun add` and other managers are not gated. | v1 |
+
+---
+
 ## Risk signals
 
 | Signal | Points | Triggered when |
