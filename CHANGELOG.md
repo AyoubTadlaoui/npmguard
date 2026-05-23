@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-05-23
+
+### Added
+- `npmguard hook`: a deterministic Claude Code PreToolUse gate. Run `npmguard hook install` and Claude Code screens every `npm install` the agent runs before lifecycle scripts fire, denying confirmed-malicious or block-tier packages. The hook runs in Claude Code's harness, not the model, so the model cannot skip it. Claude Code only for now; Cursor and Codex stay on the advisory MCP path.
+
+### Changed
+- README rewritten in first person, leading with the AI-agent threat, with verified MCP setup for Claude Code, Cursor, and Codex.
+- New hero demo: a real Claude Code session stopped from installing a malicious typosquat.
+
 ## [0.1.4] — 2026-05-21
 
 ### Added
@@ -179,6 +188,7 @@ MCP tool for AI coding agents.
 - Cross-platform release pipeline (macOS x86_64+arm64, Linux x86_64+arm64,
   Windows x86_64) via GitHub Actions matrix + SHA256SUMS.txt.
 
+[0.1.5]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.5
 [0.1.4]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.4
 [0.1.3]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.3
 [0.1.2]: https://github.com/AyoubTadlaoui/npmguard/releases/tag/v0.1.2
