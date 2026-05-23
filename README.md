@@ -11,7 +11,7 @@ Shipped as one Rust binary, *outside* npm — so the gate can't be poisoned by t
 [![Latest release](https://img.shields.io/github/v/release/AyoubTadlaoui/npmguard)](https://github.com/AyoubTadlaoui/npmguard/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-![npmguard block verdict — atlas-ragnarok theme](docs/hero.png)
+![Claude Code refusing to install `lodahs` — a confirmed-malicious typosquat (OSV MAL-2025-25502) — through npmguard's MCP gate. Real session, atlas-ragnarok theme.](docs/hero-claude.webp)
 
 `npmguard install lodahs` — a real typosquat of `lodash`, refused before lifecycle scripts can run:
 
