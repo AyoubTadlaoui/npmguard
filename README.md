@@ -1,6 +1,6 @@
 # npmguard
 
-**I built this because my AI coding agent kept installing npm packages without asking. npmguard screens them before a single install script runs.**
+**I built this because it's wild how many vibe-coders just run the AI on auto-mode and let it install whatever it wants. npmguard screens them before a single install script runs.**
 
 Claude Code, Cursor, and Codex run `npm install` autonomously. Nobody pauses to ask "wait, is `supabase-mcp-helper` even real?" I built npmguard as an MCP server and CLI that scores every package (OSV malware data, typosquat/slopsquat, install-script analysis) and returns a verdict before lifecycle scripts fire.
 
