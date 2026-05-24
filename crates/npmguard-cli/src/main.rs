@@ -16,7 +16,7 @@ use clap::{Parser, Subcommand};
 use owo_colors::OwoColorize;
 
 use npmguard_cache::VerdictCache;
-use npmguard_risk::{PackageRef, RiskEngine, RiskLevel, RiskVerdict, Thresholds};
+use npmguard_risk::{ClosureReport, PackageRef, RiskEngine, RiskLevel, RiskVerdict, Thresholds};
 
 mod hook;
 
@@ -127,6 +127,13 @@ enum Command {
         /// One or more package specs. Examples: `lodash`, `lodash@4.17.21`, `@ctrl/tinycolor@4.0.0`.
         #[arg(required = true, num_args = 1..)]
         packages: Vec<String>,
+
+        /// Also scan the full transitive dependency tree for malware. Resolves
+        /// the dependency closure from the registry and flags any package in it
+        /// with an OSV malicious-package advisory or an npm `-security` takedown
+        /// stub. Most supply-chain worms hide in a transitive dep.
+        #[arg(long)]
+        deep: bool,
     },
 
     /// Evaluate risk and (in v0.1) print what `npm install` would do. v0.2 will
@@ -248,9 +255,9 @@ async fn run(cli: Cli) -> Result<i32> {
         }
     };
 
-    let (packages, install_mode, auto_yes) = match cli.command {
-        Command::Check { packages } => (packages, false, false),
-        Command::Install { packages, yes } => (packages, true, yes),
+    let (packages, install_mode, auto_yes, deep) = match cli.command {
+        Command::Check { packages, deep } => (packages, false, false, deep),
+        Command::Install { packages, yes } => (packages, true, yes, false),
         Command::Hook { .. } => unreachable!("handled above"),
     };
 
@@ -258,8 +265,24 @@ async fn run(cli: Cli) -> Result<i32> {
     for spec in packages {
         let pkg = PackageRef::parse(&spec)?;
         let verdict = resolve_verdict(&engine, cache.as_ref(), &pkg).await?;
+        // The deep closure scan runs against the resolved version of the root.
+        let closure = if deep {
+            match engine
+                .evaluate_closure(&pkg, &npmguard_risk::ResolveOpts::default())
+                .await
+            {
+                Ok(report) => Some(report),
+                Err(e) => {
+                    tracing::warn!("deep scan failed for {}: {}", pkg.display(), e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
         let code = present(
             &verdict,
+            closure.as_ref(),
             cli.json,
             install_mode,
             auto_yes,
@@ -304,21 +327,49 @@ async fn resolve_verdict(
 
 fn present(
     verdict: &RiskVerdict,
+    closure: Option<&ClosureReport>,
     as_json: bool,
     install_mode: bool,
     auto_yes: bool,
     thresholds: &Thresholds,
 ) -> Result<i32> {
     if as_json {
-        let out = serde_json::to_string_pretty(verdict)?;
+        // When a deep scan ran, emit the verdict and closure report together so
+        // a `--json` consumer sees the whole tree result, not just the root.
+        let out = match closure {
+            Some(report) => serde_json::to_string_pretty(&serde_json::json!({
+                "verdict": verdict,
+                "closure": report,
+            }))?,
+            None => serde_json::to_string_pretty(verdict)?,
+        };
         println!("{}", out);
-        return Ok(verdict.level.exit_code());
+        // A malicious transitive dep escalates to block-tier exit regardless of
+        // the root's own verdict.
+        let exit = verdict.level.exit_code();
+        return Ok(if closure.is_some_and(|c| c.has_findings()) {
+            exit.max(RiskLevel::Block.exit_code())
+        } else {
+            exit
+        });
     }
 
     print_verdict(verdict, thresholds);
 
+    // The deep-scan summary follows the root verdict. A finding here escalates
+    // the overall result to block-tier even when the root scored clean.
+    let closure_block = closure.is_some_and(|c| c.has_findings());
+    if let Some(report) = closure {
+        print_closure(report);
+    }
+
     if !install_mode {
-        return Ok(verdict.level.exit_code());
+        let exit = verdict.level.exit_code();
+        return Ok(if closure_block {
+            exit.max(RiskLevel::Block.exit_code())
+        } else {
+            exit
+        });
     }
 
     match verdict.level {
@@ -397,6 +448,32 @@ fn print_verdict(v: &RiskVerdict, t: &Thresholds) {
                 s.detail
             );
         }
+    }
+}
+
+fn print_closure(report: &ClosureReport) {
+    println!(
+        "\n{} scanned {} dependencies in the tree",
+        color::bold("npmguard deep"),
+        report.scanned
+    );
+    if report.findings.is_empty() {
+        println!(
+            "  {} no malicious packages found in the dependency tree ({} scanned)",
+            color::green("ok"),
+            report.scanned
+        );
+        return;
+    }
+    for f in &report.findings {
+        println!(
+            "  {} {}@{}",
+            color::red_bold("malware"),
+            color::bold(&f.node.name),
+            f.node.version
+        );
+        println!("    path:   {}", f.node.path.join(" > "));
+        println!("    reason: {}", f.detail);
     }
 }
 

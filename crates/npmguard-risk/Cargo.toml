@@ -23,6 +23,7 @@ chrono = { workspace = true }
 futures = { workspace = true }
 strsim = { workspace = true }
 schemars = { workspace = true }
+nodejs-semver = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

@@ -4,6 +4,8 @@ use anyhow::Result;
 use chrono::Utc;
 use std::sync::Arc;
 
+use crate::closure::{self, ClosureReport};
+use crate::resolver::{self, ResolveOpts};
 use crate::scoring::{compute_level, Thresholds};
 use crate::signals::{self, registry::NpmRegistryClient, PackageMetadata};
 use crate::types::{PackageRef, RiskVerdict, SignalKind, SignalSetHash};
@@ -114,5 +116,26 @@ impl RiskEngine {
     pub async fn evaluate(&self, pkg: &PackageRef) -> Result<RiskVerdict> {
         let meta = self.fetch_metadata(pkg).await?;
         self.evaluate_from_metadata(pkg, meta).await
+    }
+
+    /// Scan the package's full transitive dependency closure for malware.
+    ///
+    /// Resolves the root version (the same way `evaluate` does), walks its
+    /// direct and transitive runtime dependencies into a deduped, bounded
+    /// closure, batch-queries OSV for malicious-package advisories, and folds in
+    /// the local `-security` takedown-stub check. The root itself is not part of
+    /// the returned closure; callers evaluate the root separately. All network
+    /// work is best-effort: a failed fetch is logged and skipped, never aborting
+    /// the scan.
+    pub async fn evaluate_closure(
+        &self,
+        pkg: &PackageRef,
+        opts: &ResolveOpts,
+    ) -> Result<ClosureReport> {
+        let meta = self.fetch_metadata(pkg).await?;
+        let nodes =
+            resolver::resolve_closure(&self.registry, &pkg.name, &meta.resolved_version, opts)
+                .await?;
+        closure::evaluate_closure_nodes(&self.http, nodes).await
     }
 }
