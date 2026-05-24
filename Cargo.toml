@@ -8,7 +8,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
@@ -53,8 +53,8 @@ futures = "0.3"
 directories = "5"
 
 # MCP SDK
-rmcp = { version = "0.2", features = ["server", "transport-io"] }
-schemars = "0.8"
+rmcp = { version = "1.7", features = ["server", "transport-io"] }
+schemars = "1"
 
 # Color output
 owo-colors = { version = "4", features = ["supports-colors"] }

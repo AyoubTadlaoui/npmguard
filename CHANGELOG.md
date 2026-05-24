@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-05-24
+
+### Changed
+- Upgraded the `rmcp` MCP SDK from 0.2 to 1.7. This clears CVE-2026-42559 / GHSA-89vp-x53w-74fx, a DNS rebinding vulnerability (CVSS 8.8) in rmcp's Streamable HTTP server transport. npmguard only ever uses the stdio transport, so it was never exploitable, but the dependency now sits on a patched release.
+
+### Fixed
+- The MCP server now identifies itself as `npmguard` in its `serverInfo` handshake instead of reporting the underlying SDK name.
+
 ## [0.1.7] - 2026-05-24
 
 ### Added
