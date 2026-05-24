@@ -15,4 +15,4 @@ pub mod release_anomaly;
 pub mod security_holding;
 pub mod typosquat;
 
-pub use registry::{NpmRegistryClient, PackageMetadata};
+pub use registry::{NpmRegistryClient, PackageMetadata, Packument, VersionDeps};

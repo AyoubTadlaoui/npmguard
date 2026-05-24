@@ -6,7 +6,7 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 const REGISTRY_BASE: &str = "https://registry.npmjs.org";
@@ -70,22 +70,54 @@ impl NpmRegistryClient {
     /// Fetch the full packument and project it into `PackageMetadata` for the
     /// requested version (or `latest` dist-tag if `version` is `None`).
     pub async fn fetch(&self, name: &str, version: Option<&str>) -> Result<PackageMetadata> {
-        // Use the verbose packument (no Accept: application/vnd.npm.install-v1+json)
-        // because we need `time` and `maintainers` per version.
+        let raw = self.fetch_raw(name).await?;
+        project_metadata(name, version, &raw)
+    }
+
+    /// Fetch the full packument and project it into a `Packument`: the per
+    /// version `dependencies` / `optionalDependencies` maps plus `dist-tags`,
+    /// which is all the dependency-closure resolver needs. Reuses the same
+    /// fetch path (and 16 MiB guard) as `fetch`.
+    pub async fn fetch_packument(&self, name: &str) -> Result<Packument> {
+        // Closure resolution only needs each version's dependency maps and the
+        // dist-tags, so request the abbreviated packument
+        // (`application/vnd.npm.install-v1+json`). It is far smaller than the
+        // verbose document, which keeps popular packages (e.g. `next`, `npm`)
+        // under the body cap instead of being skipped, and cuts bandwidth.
+        let raw = self.fetch_raw_abbreviated(name).await?;
+        Ok(project_packument(&raw))
+    }
+
+    /// Fetch the verbose packument JSON. Used by `fetch` because its projection
+    /// needs per-version `time` and `maintainers`, which the abbreviated
+    /// document omits.
+    async fn fetch_raw(&self, name: &str) -> Result<serde_json::Value> {
+        self.get_packument(name, false).await
+    }
+
+    /// Fetch the abbreviated packument (`application/vnd.npm.install-v1+json`):
+    /// versions with their dependency maps plus dist-tags. Used by the
+    /// dependency-closure resolver.
+    async fn fetch_raw_abbreviated(&self, name: &str) -> Result<serde_json::Value> {
+        self.get_packument(name, true).await
+    }
+
+    /// Shared GET, body-cap guard, and JSON parse for both packument flavours.
+    /// A packument that exceeds the cap is either malformed or adversarial, so
+    /// we bail rather than materialise the whole body in memory.
+    async fn get_packument(&self, name: &str, abbreviated: bool) -> Result<serde_json::Value> {
         let url = format!("{}/{}", REGISTRY_BASE, encode_pkg_name(name));
-        let resp = self
-            .http
-            .get(&url)
-            .send()
-            .await
-            .with_context(|| format!("GET {}", url))?;
+        let mut req = self.http.get(&url);
+        if abbreviated {
+            req = req.header(
+                reqwest::header::ACCEPT,
+                "application/vnd.npm.install-v1+json",
+            );
+        }
+        let resp = req.send().await.with_context(|| format!("GET {}", url))?;
         if !resp.status().is_success() {
             anyhow::bail!("registry returned {} for {}", resp.status(), name);
         }
-
-        // Guard against oversized responses before deserializing. A packument
-        // that exceeds the cap is either malformed or adversarial; bail loudly
-        // rather than materialising the whole body in memory.
         if let Some(len) = resp.content_length() {
             if len as usize > MAX_BODY_BYTES {
                 anyhow::bail!(
@@ -108,9 +140,67 @@ impl NpmRegistryClient {
                 MAX_BODY_BYTES / 1024 / 1024
             );
         }
-        let raw: serde_json::Value =
-            serde_json::from_slice(&bytes).context("parsing registry json")?;
-        project_metadata(name, version, &raw)
+        serde_json::from_slice(&bytes).context("parsing registry json")
+    }
+}
+
+/// A parsed packument projection for dependency-closure resolution. Carries only
+/// what the resolver scores on: each published version's runtime and optional
+/// dependency ranges, plus the `dist-tags` map (so a `latest` / `*` range can be
+/// resolved without a second fetch).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Packument {
+    /// Published version string to its dependency maps. `BTreeMap` so the key
+    /// set is deterministic; range resolution parses keys into semver `Version`s.
+    pub versions: BTreeMap<String, VersionDeps>,
+    /// dist-tag name (e.g. `latest`, `next`) to the version it points at.
+    pub dist_tags: HashMap<String, String>,
+}
+
+/// One published version's dependency maps, as declared in its package.json.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VersionDeps {
+    /// Runtime dependencies (name to semver range).
+    pub dependencies: HashMap<String, String>,
+    /// Optional dependencies (name to semver range).
+    pub optional_dependencies: HashMap<String, String>,
+}
+
+/// Project the raw packument JSON into a `Packument`. Tolerant of missing
+/// fields: a packument with no `versions` yields an empty map rather than an
+/// error, so a malformed entry never aborts the closure walk.
+fn project_packument(raw: &serde_json::Value) -> Packument {
+    let versions = raw
+        .get("versions")
+        .and_then(|v| v.as_object())
+        .map(|o| {
+            o.iter()
+                .map(|(ver, obj)| {
+                    (
+                        ver.clone(),
+                        VersionDeps {
+                            dependencies: extract_string_map(obj, "dependencies"),
+                            optional_dependencies: extract_string_map(obj, "optionalDependencies"),
+                        },
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let dist_tags = raw
+        .get("dist-tags")
+        .and_then(|v| v.as_object())
+        .map(|o| {
+            o.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Packument {
+        versions,
+        dist_tags,
     }
 }
 
@@ -329,5 +419,45 @@ mod tests {
             normalize_repo_url("git@github.com:foo/bar.git"),
             "https://github.com/foo/bar"
         );
+    }
+
+    #[test]
+    fn projects_packument_versions_and_tags() {
+        let raw = serde_json::json!({
+            "dist-tags": { "latest": "2.0.0", "next": "3.0.0-rc.1" },
+            "versions": {
+                "1.0.0": {
+                    "dependencies": { "left-pad": "^1.0.0" },
+                    "optionalDependencies": { "fsevents": "~2.3.0" }
+                },
+                "2.0.0": {
+                    "dependencies": { "left-pad": "^1.3.0" }
+                }
+            }
+        });
+        let p = project_packument(&raw);
+        assert_eq!(p.dist_tags.get("latest").map(String::as_str), Some("2.0.0"));
+        assert_eq!(p.versions.len(), 2);
+        assert_eq!(
+            p.versions["1.0.0"].dependencies.get("left-pad").unwrap(),
+            "^1.0.0"
+        );
+        assert_eq!(
+            p.versions["1.0.0"]
+                .optional_dependencies
+                .get("fsevents")
+                .unwrap(),
+            "~2.3.0"
+        );
+        // A version without optionalDependencies projects to an empty map, not
+        // a missing key.
+        assert!(p.versions["2.0.0"].optional_dependencies.is_empty());
+    }
+
+    #[test]
+    fn projects_empty_packument_without_panicking() {
+        let p = project_packument(&serde_json::json!({}));
+        assert!(p.versions.is_empty());
+        assert!(p.dist_tags.is_empty());
     }
 }

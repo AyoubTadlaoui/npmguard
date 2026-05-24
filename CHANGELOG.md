@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-05-24
+
+### Added
+- `npmguard check <pkg> --deep`: transitive dependency closure scan. It resolves the package's full dependency tree from the registry, with npm-accurate semver range resolution and no dependency on npm itself, batch-queries OSV across the whole closure, and reports any confirmed-malicious package in the tree along with the dependency path to it. Most supply-chain compromises ride in through a transitive dependency that a single-package check never sees. The walk is bounded by depth and node count so a large tree cannot hang, and it uses the abbreviated registry packument so even very large packages are scanned rather than skipped.
+
 ## [0.1.6] - 2026-05-23
 
 ### Added
