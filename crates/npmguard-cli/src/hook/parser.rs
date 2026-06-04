@@ -1,18 +1,26 @@
-//! Parse a shell command string and extract npm/yarn/pnpm package-install
-//! invocations from it.
+//! Parse a shell command string and extract npm/yarn/pnpm/bun package-install
+//! and on-the-fly package-runner invocations from it.
 //!
 //! This module is intentionally kept pure (no I/O, no network). Every public
 //! function is unit-testable without a runtime.
 //!
-//! # Scope limitations (v1)
+//! # Coverage
+//!
+//! Installs: `npm install`/`i`/`add`, `yarn add`, `pnpm add`/`install`/`i`,
+//! `bun add`/`install`/`i`.
+//!
+//! Runners (fetch-and-execute a package that is not in any manifest, the exact
+//! vector an agent uses to pull code without a lockfile entry): `npx`, `bunx`,
+//! `npm exec`/`x`, `pnpm dlx`, `yarn dlx`, `bun x`. For a runner only the
+//! *executed* package is checked, never the arguments passed to it.
+//!
+//! # Scope limitations
 //!
 //! * Bare `npm install` (no package arguments) is treated as a lockfile
-//!   restore. It is NOT gated. This is a conscious v1 choice.
+//!   restore. It is NOT gated. This is a conscious choice.
 //! * A sufficiently obfuscated or indirected command (shell variable expansion,
 //!   heredoc, eval, etc.) can evade the parser. Full enforcement requires the
 //!   v0.2 npm-wrapper + sandbox layer.
-//! * Only the three major package managers are recognised: npm, yarn, pnpm.
-//!   Bun's `bun add` and others are not gated in v1.
 
 /// A package spec extracted from a detected install invocation.
 ///
@@ -106,49 +114,133 @@ fn packages_from_fragment(fragment: &str) -> Vec<ExtractedPackage> {
         "npm" | "npm.cmd" => parse_npm(&tokens),
         "yarn" => parse_yarn(&tokens),
         "pnpm" => parse_pnpm(&tokens),
+        "bun" => parse_bun(&tokens),
+        // Bare runners: the binary itself is the runner, packages follow directly.
+        "npx" | "npx.cmd" | "bunx" | "bunx.cmd" => parse_runner(&tokens[1..]),
         _ => vec![],
     }
 }
 
 /// Parse an `npm` invocation.
 ///
-/// Recognised subcommands that install packages from the registry:
-/// `install`, `i`, `add` (npm>=9 alias).
+/// Install subcommands (registry install): `install`, `i`, `add` (npm>=9 alias).
+/// Runner subcommands (fetch-and-execute): `exec`, `x`.
 ///
-/// NOT recognised (intentionally not gated in v1):
+/// NOT recognised (intentionally not gated):
 /// `npm run`, `npm ci`, `npm update`, etc.
 fn parse_npm(tokens: &[&str]) -> Vec<ExtractedPackage> {
     // tokens[0] = "npm"
     // tokens[1] = subcommand (maybe)
     let subcmd = tokens.get(1).copied().unwrap_or("");
-    if !matches!(subcmd, "install" | "i" | "add") {
-        return vec![];
+    match subcmd {
+        "install" | "i" | "add" => collect_pkg_args(&tokens[2..]),
+        "exec" | "x" => parse_runner(&tokens[2..]),
+        _ => vec![],
     }
-    collect_pkg_args(&tokens[2..])
 }
 
 /// Parse a `yarn` invocation.
 ///
-/// Recognised: `yarn add`.
+/// Recognised: `yarn add` (install), `yarn dlx` (runner).
 /// NOT recognised: `yarn`, `yarn install` (lockfile).
 fn parse_yarn(tokens: &[&str]) -> Vec<ExtractedPackage> {
     let subcmd = tokens.get(1).copied().unwrap_or("");
-    if subcmd != "add" {
-        return vec![];
+    match subcmd {
+        "add" => collect_pkg_args(&tokens[2..]),
+        "dlx" => parse_runner(&tokens[2..]),
+        _ => vec![],
     }
-    collect_pkg_args(&tokens[2..])
 }
 
 /// Parse a `pnpm` invocation.
 ///
-/// Recognised: `pnpm add`.
-/// Also matches `pnpm install <pkgs>` when explicit packages follow.
+/// Recognised: `pnpm add`, `pnpm install <pkgs>`/`i <pkgs>` (install when
+/// explicit packages follow), `pnpm dlx` (runner).
 fn parse_pnpm(tokens: &[&str]) -> Vec<ExtractedPackage> {
     let subcmd = tokens.get(1).copied().unwrap_or("");
-    if !matches!(subcmd, "add" | "install" | "i") {
-        return vec![];
+    match subcmd {
+        "add" | "install" | "i" => collect_pkg_args(&tokens[2..]),
+        "dlx" => parse_runner(&tokens[2..]),
+        _ => vec![],
     }
-    collect_pkg_args(&tokens[2..])
+}
+
+/// Parse a `bun` invocation.
+///
+/// Recognised: `bun add`/`install`/`i` (install when explicit packages follow),
+/// `bun x` (the `bunx` runner).
+/// NOT recognised: bare `bun install` (lockfile), `bun run`, `bun remove`.
+fn parse_bun(tokens: &[&str]) -> Vec<ExtractedPackage> {
+    let subcmd = tokens.get(1).copied().unwrap_or("");
+    match subcmd {
+        "add" | "install" | "i" => collect_pkg_args(&tokens[2..]),
+        "x" => parse_runner(&tokens[2..]),
+        _ => vec![],
+    }
+}
+
+/// Parse the arguments of a package *runner* (`npx`, `bunx`, `npm exec`,
+/// `pnpm dlx`, `yarn dlx`, `bun x`).
+///
+/// `args` is everything after the runner keyword. A runner downloads and
+/// executes one package on the fly, so only the *executed* package is a risk
+/// target; the tokens after it are arguments to that program and must not be
+/// treated as packages (`npx create-react-app my-app` checks `create-react-app`,
+/// never `my-app`).
+///
+/// `-p`/`--package`/`--package=` name explicit packages to fetch; when present,
+/// the trailing bare token is the command to run *from* those packages, not a
+/// package itself.
+fn parse_runner(args: &[&str]) -> Vec<ExtractedPackage> {
+    let mut packages = Vec::new();
+    let mut saw_explicit_package = false;
+    let mut i = 0usize;
+
+    while i < args.len() {
+        let arg = args[i];
+
+        // `-p pkg` / `--package pkg`: explicit package, value is the next token.
+        if arg == "-p" || arg == "--package" {
+            if let Some(&val) = args.get(i + 1) {
+                if looks_like_package_spec(val) {
+                    packages.push(ExtractedPackage {
+                        spec: val.to_string(),
+                    });
+                    saw_explicit_package = true;
+                }
+            }
+            i += 2;
+            continue;
+        }
+        // `--package=pkg`: explicit package, value is inline.
+        if let Some(val) = arg.strip_prefix("--package=") {
+            if looks_like_package_spec(val) {
+                packages.push(ExtractedPackage {
+                    spec: val.to_string(),
+                });
+                saw_explicit_package = true;
+            }
+            i += 1;
+            continue;
+        }
+        // Any other flag (`-y`, `--yes`, `--`, ...): skip the flag token only.
+        if arg.starts_with('-') {
+            i += 1;
+            continue;
+        }
+
+        // First bare token. If `--package` already named the target(s), this is
+        // the command to execute, not a package. Otherwise it IS the package.
+        if !saw_explicit_package && looks_like_package_spec(arg) {
+            packages.push(ExtractedPackage {
+                spec: arg.to_string(),
+            });
+        }
+        // Everything after the executed token is its own arguments: stop.
+        break;
+    }
+
+    packages
 }
 
 /// Collect explicit package specs from the tail of a tokenised command,
@@ -343,5 +435,131 @@ mod tests {
     fn flags_only_returns_empty() {
         // `npm install -D` with no package: treat as bare install.
         assert!(extract_packages("npm install -D").is_empty());
+    }
+
+    // --- bun installs ---
+
+    #[test]
+    fn bun_add() {
+        let pkgs = extract_packages("bun add left-pad");
+        assert_eq!(specs(&pkgs), vec!["left-pad"]);
+    }
+
+    #[test]
+    fn bun_install_with_package() {
+        let pkgs = extract_packages("bun install react");
+        assert_eq!(specs(&pkgs), vec!["react"]);
+    }
+
+    #[test]
+    fn bun_i_shorthand() {
+        let pkgs = extract_packages("bun i -d typescript");
+        assert_eq!(specs(&pkgs), vec!["typescript"]);
+    }
+
+    #[test]
+    fn bare_bun_install_returns_empty() {
+        // Lockfile restore, never gated.
+        assert!(extract_packages("bun install").is_empty());
+    }
+
+    #[test]
+    fn bun_run_returns_empty() {
+        assert!(extract_packages("bun run build").is_empty());
+    }
+
+    // --- runners: npx / bunx / bun x / npm exec / dlx ---
+
+    #[test]
+    fn npx_single() {
+        let pkgs = extract_packages("npx cowsay");
+        assert_eq!(specs(&pkgs), vec!["cowsay"]);
+    }
+
+    #[test]
+    fn npx_only_executed_pkg_not_its_args() {
+        // `my-app` is an argument to create-react-app, not a package.
+        let pkgs = extract_packages("npx create-react-app my-app");
+        assert_eq!(specs(&pkgs), vec!["create-react-app"]);
+    }
+
+    #[test]
+    fn npx_skips_leading_flags() {
+        let pkgs = extract_packages("npx -y cowsay moo");
+        assert_eq!(specs(&pkgs), vec!["cowsay"]);
+    }
+
+    #[test]
+    fn npx_explicit_package_flag() {
+        // `-p foo cmd`: foo is the package, cmd runs from it.
+        let pkgs = extract_packages("npx -p typescript tsc --init");
+        assert_eq!(specs(&pkgs), vec!["typescript"]);
+    }
+
+    #[test]
+    fn npx_explicit_package_eq_form() {
+        let pkgs = extract_packages("npx --package=@scope/tool run");
+        assert_eq!(specs(&pkgs), vec!["@scope/tool"]);
+    }
+
+    #[test]
+    fn bunx_single() {
+        let pkgs = extract_packages("bunx prettier --write .");
+        assert_eq!(specs(&pkgs), vec!["prettier"]);
+    }
+
+    #[test]
+    fn bun_x_runner() {
+        let pkgs = extract_packages("bun x eslint .");
+        assert_eq!(specs(&pkgs), vec!["eslint"]);
+    }
+
+    #[test]
+    fn npm_exec_runner() {
+        let pkgs = extract_packages("npm exec create-react-app my-app");
+        assert_eq!(specs(&pkgs), vec!["create-react-app"]);
+    }
+
+    #[test]
+    fn npm_x_runner() {
+        let pkgs = extract_packages("npm x cowsay");
+        assert_eq!(specs(&pkgs), vec!["cowsay"]);
+    }
+
+    #[test]
+    fn pnpm_dlx_runner() {
+        let pkgs = extract_packages("pnpm dlx create-vite my-app");
+        assert_eq!(specs(&pkgs), vec!["create-vite"]);
+    }
+
+    #[test]
+    fn yarn_dlx_runner() {
+        let pkgs = extract_packages("yarn dlx create-vite my-app");
+        assert_eq!(specs(&pkgs), vec!["create-vite"]);
+    }
+
+    #[test]
+    fn npx_scoped_with_version() {
+        let pkgs = extract_packages("npx @angular/cli@17 new app");
+        assert_eq!(specs(&pkgs), vec!["@angular/cli@17"]);
+    }
+
+    #[test]
+    fn chained_npx_after_cd() {
+        let pkgs = extract_packages("cd /tmp && npx evil-tool");
+        assert_eq!(specs(&pkgs), vec!["evil-tool"]);
+    }
+
+    // --- runners that must NOT extract anything ---
+
+    #[test]
+    fn bare_npx_returns_empty() {
+        assert!(extract_packages("npx").is_empty());
+    }
+
+    #[test]
+    fn npx_local_path_not_a_package() {
+        // `npx ./scripts/foo` runs a local file, not a registry package.
+        assert!(extract_packages("npx ./scripts/build.js").is_empty());
     }
 }
