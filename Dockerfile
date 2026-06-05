@@ -18,7 +18,7 @@
 # ----------------------------------------------------------------------------
 # Stage 1 — build the binary against a pinned Rust toolchain
 # ----------------------------------------------------------------------------
-FROM rust:1.85-bookworm AS builder
+FROM rust:1.96-bookworm AS builder
 WORKDIR /src
 
 # Copy the workspace manifests first so layer caching can reuse dependency
