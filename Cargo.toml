@@ -50,7 +50,7 @@ chrono = { version = "0.4", default-features = false, features = ["serde", "cloc
 futures = "0.3"
 
 # Filesystem paths
-directories = "5"
+directories = "6"
 
 # MCP SDK
 rmcp = { version = "1.7", features = ["server", "transport-io"] }
