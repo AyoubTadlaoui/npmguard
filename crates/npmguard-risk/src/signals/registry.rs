@@ -16,6 +16,31 @@ const REGISTRY_BASE: &str = "https://registry.npmjs.org";
 /// larger is almost certainly a misconfigured proxy or an adversarial response.
 const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 
+/// The npm registry has no record of a package name (HTTP 404).
+///
+/// Distinguished from every other registry failure because a 404 is exactly what
+/// npm serves once it takes a malicious package down. Callers treat this case
+/// specially: rather than degrading to a generic "could not verify", they consult
+/// OSV by name and hard-block a removed package that is confirmed malware. A
+/// transient 5xx, a timeout, or a body-cap breach stays a generic error and never
+/// reaches that path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackageNotFound {
+    pub name: String,
+}
+
+impl std::fmt::Display for PackageNotFound {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "package `{}` not found in the npm registry (404)",
+            self.name
+        )
+    }
+}
+
+impl std::error::Error for PackageNotFound {}
+
 /// Subset of the npm packument we care about. Many fields are intentionally
 /// untyped (`serde_json::Value`); we only deserialize what we score on.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,6 +140,14 @@ impl NpmRegistryClient {
             );
         }
         let resp = req.send().await.with_context(|| format!("GET {}", url))?;
+        if resp.status() == reqwest::StatusCode::NOT_FOUND {
+            // A removed/unpublished package. Surface a typed error so the caller
+            // can run an OSV malware lookup instead of a soft "could not verify".
+            return Err(PackageNotFound {
+                name: name.to_string(),
+            }
+            .into());
+        }
         if !resp.status().is_success() {
             anyhow::bail!("registry returned {} for {}", resp.status(), name);
         }

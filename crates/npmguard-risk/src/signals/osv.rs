@@ -78,6 +78,43 @@ pub async fn evaluate(
         .collect())
 }
 
+/// OSV's `MAL-*` namespace is the malicious-package database. A hit confirms
+/// malware (not a flaw in a legitimate package); both the `MAL-` and the
+/// `OSV-MAL-` id prefixes are used in practice.
+fn is_malware_id(id: &str) -> bool {
+    id.starts_with("MAL-") || id.starts_with("OSV-MAL-")
+}
+
+/// Extract the deduped malicious-package advisory ids from a set of OSV vulns,
+/// preserving first-seen order.
+fn malware_ids(vulns: &[OsvVuln]) -> Vec<String> {
+    let mut ids: Vec<String> = Vec::new();
+    for v in vulns {
+        if is_malware_id(&v.id) && !ids.iter().any(|x| x == &v.id) {
+            ids.push(v.id.clone());
+        }
+    }
+    ids
+}
+
+/// Look up malicious-package advisories for a package by NAME ONLY, for the case
+/// where the npm registry no longer serves it (a 404 / removed package).
+///
+/// Unlike [`evaluate`], this applies no version or prerelease gating. The
+/// prerelease gate in [`classify`] exists to protect the clean *current* version
+/// of a still-published package that was compromised only in since-removed
+/// versions. A package npm has fully removed has no current version to protect,
+/// so any `MAL-*` advisory for the name is authoritative evidence it was taken
+/// down for malware. Returns the advisory ids, or an empty vec when OSV has none
+/// (a genuinely unknown / never-published name).
+pub async fn malware_advisories_for_name(
+    http: &reqwest::Client,
+    name: &str,
+) -> Result<Vec<String>> {
+    let vulns = query(http, name, None).await?;
+    Ok(malware_ids(&vulns))
+}
+
 /// Issue a single OSV `/v1/query`. `version = None` is a package-level query
 /// (every advisory for the package); `Some(v)` asks OSV to match `v` against
 /// advisory ranges. Best-effort: a non-2xx response is logged and treated as
@@ -125,14 +162,12 @@ fn classify(
     package_level: &[OsvVuln],
     resolved_is_prerelease: bool,
 ) -> Option<Signal> {
-    fn is_malware(v: &OsvVuln) -> bool {
-        v.id.starts_with("MAL-") || v.id.starts_with("OSV-MAL-")
-    }
     // The versioned query is authoritative; the package-level query is a
     // prerelease-only fallback (see the doc comment above).
-    let mut mal_sources: Vec<&OsvVuln> = versioned.iter().filter(|v| is_malware(v)).collect();
+    let mut mal_sources: Vec<&OsvVuln> =
+        versioned.iter().filter(|v| is_malware_id(&v.id)).collect();
     if resolved_is_prerelease {
-        mal_sources.extend(package_level.iter().filter(|v| is_malware(v)));
+        mal_sources.extend(package_level.iter().filter(|v| is_malware_id(&v.id)));
     }
     let mut mal_ids: Vec<&str> = Vec::new();
     for v in mal_sources {
@@ -415,6 +450,28 @@ mod tests {
     #[test]
     fn no_advisories_anywhere_is_none() {
         assert!(classify(&[], &[], false).is_none());
+    }
+
+    #[test]
+    fn malware_ids_keeps_only_mal_advisories() {
+        let vulns = vec![
+            vuln("MAL-2025-1"),
+            cve("9.8"),
+            vuln("OSV-MAL-2"),
+            vuln("GHSA-abcd"),
+        ];
+        assert_eq!(malware_ids(&vulns), vec!["MAL-2025-1", "OSV-MAL-2"]);
+    }
+
+    #[test]
+    fn malware_ids_dedups_preserving_order() {
+        let vulns = vec![vuln("MAL-2025-1"), vuln("MAL-2025-1"), vuln("MAL-2025-2")];
+        assert_eq!(malware_ids(&vulns), vec!["MAL-2025-1", "MAL-2025-2"]);
+    }
+
+    #[test]
+    fn malware_ids_empty_when_no_malware() {
+        assert!(malware_ids(&[cve("7.5"), vuln("GHSA-x")]).is_empty());
     }
 
     #[test]
