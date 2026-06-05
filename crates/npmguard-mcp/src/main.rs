@@ -6,12 +6,10 @@
 
 use std::sync::Arc;
 
-use std::future::Future;
-
 use anyhow::Result;
 use rmcp::{
     handler::server::router::tool::ToolRouter,
-    handler::server::tool::Parameters,
+    handler::server::wrapper::Parameters,
     model::{
         CallToolResult, Content, ErrorData, Implementation, ProtocolVersion, ServerCapabilities,
         ServerInfo,
@@ -153,17 +151,22 @@ impl Server {
     }
 }
 
-#[tool_handler]
+#[tool_handler(router = self.tool_router)]
 impl ServerHandler for Server {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            protocol_version: ProtocolVersion::V_2024_11_05,
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            server_info: Implementation::from_build_env(),
-            instructions: Some(
-                "Use the install_package tool to evaluate npm package risk before running `npm install`. Always block on level='block'; surface signals to the user on 'warn'.".into(),
-            ),
-        }
+        // `Implementation::from_build_env` reports rmcp's own crate name and
+        // version (the `env!` macros are evaluated inside the rmcp crate), so the
+        // server would otherwise announce itself as "rmcp". Override the identity
+        // with npmguard's own name and version (this crate's CARGO_PKG_VERSION).
+        let mut server_info = Implementation::from_build_env();
+        server_info.name = "npmguard".to_string();
+        server_info.version = env!("CARGO_PKG_VERSION").to_string();
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_protocol_version(ProtocolVersion::V_2024_11_05)
+            .with_server_info(server_info)
+            .with_instructions(
+                "Use the install_package tool to evaluate npm package risk before running `npm install`. Always block on level='block'; surface signals to the user on 'warn'.",
+            )
     }
 }
 
