@@ -8,7 +8,7 @@ use crate::closure::{self, ClosureReport};
 use crate::resolver::{self, ResolveOpts};
 use crate::scoring::{compute_level, Thresholds};
 use crate::signals::{self, registry::NpmRegistryClient, PackageMetadata};
-use crate::types::{PackageRef, RiskVerdict, SignalKind, SignalSetHash};
+use crate::types::{PackageRef, RiskVerdict, Signal, SignalKind, SignalSetHash};
 
 pub struct RiskEngine {
     registry: NpmRegistryClient,
@@ -118,6 +118,30 @@ impl RiskEngine {
         self.evaluate_from_metadata(pkg, meta).await
     }
 
+    /// Build a hard-block verdict for a package the npm registry no longer serves
+    /// (HTTP 404 / [`PackageNotFound`](crate::signals::registry::PackageNotFound))
+    /// when OSV confirms the name is malware.
+    ///
+    /// A 404 is what npm returns after taking a malicious package down, so rather
+    /// than degrading to "could not verify" the caller consults OSV by name: a
+    /// `MAL-*` advisory for a removed package is unambiguous and blocks.
+    ///
+    /// Returns `Ok(None)` when OSV has no malicious-package advisory for the name
+    /// (a genuinely unknown / never-published package), so the caller can keep its
+    /// existing not-found handling (a soft "could not verify").
+    pub async fn malware_verdict_for_removed(
+        &self,
+        pkg: &PackageRef,
+    ) -> Result<Option<RiskVerdict>> {
+        let mal_ids = signals::osv::malware_advisories_for_name(&self.http, &pkg.name).await?;
+        Ok(build_removed_malware_verdict(
+            pkg,
+            &mal_ids,
+            &self.thresholds,
+            self.signal_set_hash(),
+        ))
+    }
+
     /// Scan the package's full transitive dependency closure for malware.
     ///
     /// Resolves the root version (the same way `evaluate` does), walks its
@@ -137,5 +161,127 @@ impl RiskEngine {
             resolver::resolve_closure(&self.registry, &pkg.name, &meta.resolved_version, opts)
                 .await?;
         closure::evaluate_closure_nodes(&self.http, nodes).await
+    }
+}
+
+/// Pure constructor for the removed-package malware verdict. Given the OSV
+/// malicious-package advisory ids for a name npm no longer serves, build a
+/// hard-block verdict, or `None` when there are no such advisories. Kept pure
+/// (no I/O) so the block decision is unit-testable without a network round-trip.
+fn build_removed_malware_verdict(
+    pkg: &PackageRef,
+    mal_ids: &[String],
+    thresholds: &Thresholds,
+    signal_set_hash: String,
+) -> Option<RiskVerdict> {
+    if mal_ids.is_empty() {
+        return None;
+    }
+    let shown = mal_ids
+        .iter()
+        .take(3)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    let extra = if mal_ids.len() > 3 {
+        format!(" (+{} more)", mal_ids.len() - 3)
+    } else {
+        String::new()
+    };
+    let signal = Signal {
+        kind: SignalKind::KnownCve,
+        // Max points: removed from npm AND OSV-confirmed malware is the most
+        // certain block the engine can issue.
+        points: 200,
+        detail: format!(
+            "npm has removed this package (404); OSV confirms {} malicious-package advisory(ies): {}{}",
+            mal_ids.len(),
+            shown,
+            extra
+        ),
+    };
+    let score = signal.points.min(200);
+    let level = compute_level(score, thresholds);
+    Some(RiskVerdict {
+        package: pkg.clone(),
+        resolved_version: pkg.version.clone().unwrap_or_else(|| "removed".to_string()),
+        score,
+        level,
+        signals: vec![signal],
+        fetched_at: Utc::now(),
+        published_at: None,
+        signal_set_hash,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::RiskLevel;
+
+    fn ids(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn detail(v: &RiskVerdict) -> String {
+        v.signals
+            .iter()
+            .map(|s| s.detail.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    #[test]
+    fn no_malware_ids_yields_no_verdict() {
+        let pkg = PackageRef::new("ghost-pkg", None);
+        assert!(
+            build_removed_malware_verdict(&pkg, &[], &Thresholds::default(), "h".into()).is_none()
+        );
+    }
+
+    #[test]
+    fn confirmed_malware_removal_blocks() {
+        let pkg = PackageRef::new("evil-pkg", Some("1.0.0".into()));
+        let v = build_removed_malware_verdict(
+            &pkg,
+            &ids(&["MAL-2025-1"]),
+            &Thresholds::default(),
+            "h".into(),
+        )
+        .expect("a removed + malicious package must produce a verdict");
+        assert_eq!(v.level, RiskLevel::Block);
+        assert_eq!(v.score, 200);
+        assert_eq!(v.resolved_version, "1.0.0");
+        assert_eq!(v.signals.len(), 1);
+        assert_eq!(v.signals[0].kind, SignalKind::KnownCve);
+        assert!(detail(&v).contains("MAL-2025-1"));
+        assert!(detail(&v).contains("removed"));
+    }
+
+    #[test]
+    fn resolved_version_defaults_when_unpinned() {
+        let pkg = PackageRef::new("evil-pkg", None);
+        let v = build_removed_malware_verdict(
+            &pkg,
+            &ids(&["MAL-2025-1"]),
+            &Thresholds::default(),
+            "h".into(),
+        )
+        .unwrap();
+        assert_eq!(v.resolved_version, "removed");
+    }
+
+    #[test]
+    fn many_advisories_summarised_with_overflow() {
+        let pkg = PackageRef::new("evil-pkg", None);
+        let v = build_removed_malware_verdict(
+            &pkg,
+            &ids(&["MAL-1", "MAL-2", "MAL-3", "MAL-4", "MAL-5"]),
+            &Thresholds::default(),
+            "h".into(),
+        )
+        .unwrap();
+        assert!(detail(&v).contains("+2 more"));
+        assert_eq!(v.level, RiskLevel::Block);
     }
 }

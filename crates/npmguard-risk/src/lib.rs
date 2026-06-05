@@ -17,5 +17,6 @@ pub use closure::{ClosureFinding, ClosureReport};
 pub use engine::RiskEngine;
 pub use resolver::{ResolveOpts, ResolvedNode};
 pub use scoring::{compute_level, Thresholds};
+pub use signals::registry::PackageNotFound;
 pub use signals::PackageMetadata;
 pub use types::{PackageRef, RiskLevel, RiskVerdict, Signal, SignalKind, SignalSetHash};
