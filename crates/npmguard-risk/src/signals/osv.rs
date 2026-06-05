@@ -54,28 +54,21 @@ pub async fn evaluate(
     pkg: &PackageRef,
     resolved_version: &str,
 ) -> Result<Vec<Signal>> {
-    // Two queries, run concurrently:
-    //  * versioned     - OSV server-side matches the resolved version against
-    //                    advisory ranges. Authoritative for both CVEs and
-    //                    malware that actually affect this version.
-    //  * package-level - no version, so OSV returns every advisory for the
-    //                    name. Used as a malware fallback ONLY when the resolved
-    //                    version is a prerelease: semver range matching excludes
-    //                    a prerelease (e.g. an npm `-security` takedown stub)
-    //                    from an `introduced: 0` range, silently dropping a
-    //                    whole-package MAL advisory on the versioned query.
-    let (versioned, package_level) = futures::future::join(
-        query(http, &pkg.name, Some(resolved_version)),
-        query(http, &pkg.name, None),
-    )
-    .await;
-    let versioned = versioned?;
-    let package_level = package_level?;
-    // A prerelease tag is a `-` in the version core (build metadata uses `+`).
-    let resolved_is_prerelease = resolved_version.contains('-');
-    Ok(classify(&versioned, &package_level, resolved_is_prerelease)
-        .into_iter()
-        .collect())
+    // A single versioned query. OSV matches the resolved version against advisory
+    // ranges server-side; a whole-package malware advisory uses `introduced: "0"`,
+    // which OSV matches against EVERY version, including prerelease `-security`
+    // takedown stubs (verified against the live API: lodahs@0.0.1-security and
+    // peers return their MAL on a versioned query). So this query is authoritative
+    // for both CVEs and malware affecting the resolved version.
+    //
+    // We deliberately do NOT also consult a package-level query and honor MAL hits
+    // OSV did not match to the resolved version: that would falsely flag the clean
+    // current release of a package compromised only in since-removed versions
+    // (e.g. a legitimate `-rc`/`-canary`). Fully-removed (404) packages are handled
+    // separately by `malware_advisories_for_name`, and `-security` stubs are also
+    // caught independently by the `security_holding` signal.
+    let versioned = query(http, &pkg.name, Some(resolved_version)).await?;
+    Ok(classify(&versioned).into_iter().collect())
 }
 
 /// OSV's `MAL-*` namespace is the malicious-package database. A hit confirms
@@ -100,13 +93,11 @@ fn malware_ids(vulns: &[OsvVuln]) -> Vec<String> {
 /// Look up malicious-package advisories for a package by NAME ONLY, for the case
 /// where the npm registry no longer serves it (a 404 / removed package).
 ///
-/// Unlike [`evaluate`], this applies no version or prerelease gating. The
-/// prerelease gate in [`classify`] exists to protect the clean *current* version
-/// of a still-published package that was compromised only in since-removed
-/// versions. A package npm has fully removed has no current version to protect,
-/// so any `MAL-*` advisory for the name is authoritative evidence it was taken
-/// down for malware. Returns the advisory ids, or an empty vec when OSV has none
-/// (a genuinely unknown / never-published name).
+/// Unlike [`evaluate`], which only trusts advisories OSV matched to a resolved
+/// version, this queries by name alone. A package npm has fully removed has no
+/// current version to resolve or protect, so any `MAL-*` advisory for the name is
+/// authoritative evidence it was taken down for malware. Returns the advisory ids,
+/// or an empty vec when OSV has none (a genuinely unknown / never-published name).
 pub async fn malware_advisories_for_name(
     http: &reqwest::Client,
     name: &str,
@@ -142,44 +133,26 @@ async fn query(http: &reqwest::Client, name: &str, version: Option<&str>) -> Res
     Ok(parsed.vulns)
 }
 
-/// Pure decision over OSV results.
+/// Pure decision over the versioned OSV results.
 ///
 /// OSV's `MAL-*` namespace is the malicious-package database: a hit confirms
 /// malware, not a flaw in a legitimate package, and blocks regardless of CVSS.
-/// A MAL advisory matched to the resolved version (the versioned query) is
-/// authoritative. We additionally honor a package-level MAL hit ONLY when the
-/// resolved version is a prerelease, because OSV's semver matching wrongly
-/// excludes prereleases from open-ended ranges (the `-security` takedown-stub
-/// case). We must NOT blanket-trust package-level MAL for a normal version: a
-/// legitimate package compromised only in specific, since-removed versions has
-/// a clean current version that must never be labelled malicious.
+/// Only advisories OSV matched to the resolved version are considered. OSV
+/// matches a whole-package (`introduced: "0"`) malware advisory against every
+/// version, including prerelease `-security` stubs, so the versioned query alone
+/// catches removed-malware names with no package-level fallback. This also means
+/// a legitimate package compromised only in specific, since-removed versions
+/// keeps a clean current version that is never labelled malicious, because the
+/// MAL advisory simply does not match that version.
 ///
-/// Absent malware, fall back to the worst CVE severity in the version-matched
-/// set, so an advisory that does not affect the resolved version cannot inflate
-/// the score.
-fn classify(
-    versioned: &[OsvVuln],
-    package_level: &[OsvVuln],
-    resolved_is_prerelease: bool,
-) -> Option<Signal> {
-    // The versioned query is authoritative; the package-level query is a
-    // prerelease-only fallback (see the doc comment above).
-    let mut mal_sources: Vec<&OsvVuln> =
-        versioned.iter().filter(|v| is_malware_id(&v.id)).collect();
-    if resolved_is_prerelease {
-        mal_sources.extend(package_level.iter().filter(|v| is_malware_id(&v.id)));
-    }
-    let mut mal_ids: Vec<&str> = Vec::new();
-    for v in mal_sources {
-        if !mal_ids.contains(&v.id.as_str()) {
-            mal_ids.push(v.id.as_str());
-        }
-    }
+/// Absent malware, fall back to the worst CVE severity in the set.
+fn classify(versioned: &[OsvVuln]) -> Option<Signal> {
+    let mal_ids = malware_ids(versioned);
     if !mal_ids.is_empty() {
         let shown = mal_ids
             .iter()
             .take(3)
-            .copied()
+            .map(|s| s.as_str())
             .collect::<Vec<_>>()
             .join(", ");
         let extra = if mal_ids.len() > 3 {
@@ -400,12 +373,13 @@ mod tests {
     }
 
     #[test]
-    fn prerelease_malware_in_package_level_blocks_when_versioned_empty() {
-        // The lodahs regression: the resolved version is a `-security`
-        // prerelease, so OSV's versioned query returns nothing, but the
-        // package-level query surfaces the MAL advisory. Because the resolved
-        // version is a prerelease, we honor it and block.
-        let sig = classify(&[], &[vuln("MAL-2025-25502")], true).expect("malware signal");
+    fn security_stub_malware_blocks_via_versioned_query() {
+        // The corrected lodahs case. A `-security` takedown stub is a prerelease,
+        // but its whole-package MAL advisory uses `introduced: "0"`, which OSV
+        // matches against the stub on a VERSIONED query (verified against the live
+        // API). So the MAL lands in the versioned set and blocks, with no
+        // package-level fallback.
+        let sig = classify(&[vuln("MAL-2025-25502")]).expect("malware signal");
         assert_eq!(sig.kind, SignalKind::KnownCve);
         assert_eq!(sig.points, 80);
         assert!(sig.detail.contains("MAL-2025-25502"));
@@ -413,19 +387,10 @@ mod tests {
     }
 
     #[test]
-    fn package_level_malware_does_not_block_a_clean_normal_version() {
-        // The create-glee-app regression: a legitimate package was compromised
-        // only in specific, since-removed versions. Its clean current (non
-        // prerelease) version must NOT be labelled malicious just because a MAL
-        // advisory exists for the name at package level.
-        assert!(classify(&[], &[vuln("MAL-2025-190767")], false).is_none());
-    }
-
-    #[test]
-    fn malware_in_versioned_set_blocks_regardless_of_prerelease() {
+    fn malware_in_versioned_set_blocks() {
         // A MAL advisory matched to the resolved version is authoritative.
         assert_eq!(
-            classify(&[vuln("OSV-MAL-1")], &[], false)
+            classify(&[vuln("OSV-MAL-1")])
                 .expect("malware signal")
                 .points,
             80
@@ -434,22 +399,20 @@ mod tests {
 
     #[test]
     fn versioned_cve_ranks_by_severity_not_malware() {
-        let sig = classify(&[cve("7.5")], &[], false).expect("cve signal");
+        let sig = classify(&[cve("7.5")]).expect("cve signal");
         assert_eq!(sig.kind, SignalKind::KnownCve);
         assert_eq!(sig.points, 20); // high
         assert!(sig.detail.contains("known advisories"));
     }
 
     #[test]
-    fn package_level_cve_does_not_inflate_score() {
-        // A non-malware advisory present only at package level (OSV did not
-        // match it to the resolved version) must not be scored as affecting it.
-        assert!(classify(&[], &[cve("9.8")], true).is_none());
-    }
-
-    #[test]
-    fn no_advisories_anywhere_is_none() {
-        assert!(classify(&[], &[], false).is_none());
+    fn no_versioned_advisories_is_none() {
+        // classify only sees advisories OSV matched to the resolved version. An
+        // empty set yields no signal. This is also why the clean current release
+        // of a package compromised only in since-removed versions (the
+        // create-glee-app case) is never flagged: its MAL advisory does not match
+        // the resolved version, so it never reaches classify.
+        assert!(classify(&[]).is_none());
     }
 
     #[test]
