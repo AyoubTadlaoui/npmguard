@@ -17,7 +17,7 @@ use serde::Deserialize;
 
 use decision::{aggregate_decision, HookResponse, PackageOutcome};
 use npmguard_cache::VerdictCache;
-use npmguard_risk::{PackageRef, RiskEngine};
+use npmguard_risk::{PackageNotFound, PackageRef, RiskEngine};
 
 // ---------------------------------------------------------------------------
 // CLI argument types (used by main.rs)
@@ -172,7 +172,20 @@ async fn resolve_verdict(
     cache: Option<&VerdictCache>,
     pkg: &PackageRef,
 ) -> Result<npmguard_risk::RiskVerdict> {
-    let meta = engine.fetch_metadata(pkg).await?;
+    let meta = match engine.fetch_metadata(pkg).await {
+        Ok(meta) => meta,
+        Err(e) => {
+            // A 404 from npm is exactly what a taken-down malware package serves.
+            // Before degrading to a soft "could not verify", ask OSV by name: a
+            // removed package confirmed malicious is a hard block, not an `ask`.
+            if e.downcast_ref::<PackageNotFound>().is_some() {
+                if let Some(verdict) = engine.malware_verdict_for_removed(pkg).await? {
+                    return Ok(verdict);
+                }
+            }
+            return Err(e);
+        }
+    };
     let signal_hash = engine.signal_set_hash();
     if let Some(c) = cache {
         match c.get(pkg, &meta.resolved_version, &signal_hash) {
