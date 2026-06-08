@@ -340,7 +340,7 @@ npmguard hook uninstall --scope project
 | **Claude Code only.** Cursor and Codex do not yet ship a comparable pre-tool hook API. They remain advisory-MCP only until they do. | v1 |
 | **Bare `npm install` (no package args) is not gated.** A lockfile restore (`npm install` with no arguments) is treated as pass-through. Only commands with explicit package names are checked. | v1 |
 | **Parser-level evasion is possible.** A determined or obfuscated command (`eval`, shell variable expansion, heredoc, etc.) can evade the command parser. Full enforcement requires the v0.2 npm-wrapper + sandbox layer that wraps `npm` itself rather than parsing shell strings. | v1 |
-| **Only npm / yarn / pnpm are recognised.** `bun add` and other managers are not gated. | v1 |
+| **Only npm / yarn / pnpm / bun are recognised.** Installs (`npm install`/`i`/`add`, `yarn add`, `pnpm add`/`install`/`i`, `bun add`/`install`/`i`) and on-the-fly runners (`npx`, `bunx`, `npm exec`/`x`, `pnpm dlx`, `yarn dlx`, `bun x`) are gated. Managers outside this set are not. | v1 |
 
 ---
 
