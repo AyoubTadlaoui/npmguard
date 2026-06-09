@@ -1,0 +1,14 @@
+# Coverage is measured over the workspace crates (cli, mcp, risk, cache).
+# corpus/ holds typosquat/test fixtures with no test surface of its own, so it
+# is excluded from the coverage total.
+ignore:
+  - "corpus"
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
